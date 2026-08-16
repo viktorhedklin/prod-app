@@ -1,6 +1,7 @@
-import type { DailyEntry, KPITarget, Insight, Reflection, JournalEntry, MoodCheckIn } from './types';
+import type { DailyEntry, KPITarget, Insight, Reflection, JournalEntry, MoodCheckIn, TaskItem } from './types';
 import { computeWeightedGrade } from './grading';
 import { genId } from './storage';
+import { todayLocal, addDays } from './dates';
 
 export function generateRuleBasedInsights(
   entries: Record<string, DailyEntry>,
@@ -9,11 +10,11 @@ export function generateRuleBasedInsights(
   _journal: JournalEntry[],
   moodCheckins: MoodCheckIn[],
   existingInsightTitles: Set<string>,
+  tasks: TaskItem[] = [],
 ): Insight[] {
   const insights: Insight[] = [];
   const entryList = Object.values(entries).sort((a, b) => a.date.localeCompare(b.date));
 
-  // 1. CSAT vs volume correlation
   const csatVolumeDays = entryList.filter(
     (e) => e.csat_ratings.length > 0 && (e.chats_handled + e.emails_handled) > 0,
   );
@@ -50,12 +51,9 @@ export function generateRuleBasedInsights(
     }
   }
 
-  // 2. Missing reflections
   const recentDays: string[] = [];
   for (let i = 0; i < 7; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    recentDays.push(d.toISOString().slice(0, 10));
+    recentDays.push(addDays(todayLocal(), -i));
   }
   const daysWithEntries = recentDays.filter((d) => entries[d]);
   const daysWithReflections = recentDays.filter((d) => reflections[d]);
@@ -74,23 +72,16 @@ export function generateRuleBasedInsights(
     }
   }
 
-  // 3. Escalation rate trend
   const escDays = entryList
     .filter((e) => e.escalations_raised > 0 || (e.chats_handled + e.emails_handled) > 0)
     .slice(-7);
   if (escDays.length >= 4) {
     const recentEscRate =
       escDays.slice(-3).reduce((s, e) => s + e.escalations_raised, 0) /
-      Math.max(
-        1,
-        escDays.slice(-3).reduce((s, e) => s + e.chats_handled + e.emails_handled, 0),
-      ) * 100;
+      Math.max(1, escDays.slice(-3).reduce((s, e) => s + e.chats_handled + e.emails_handled, 0)) * 100;
     const olderEscRate =
       escDays.slice(0, -3).reduce((s, e) => s + e.escalations_raised, 0) /
-      Math.max(
-        1,
-        escDays.slice(0, -3).reduce((s, e) => s + e.chats_handled + e.emails_handled, 0),
-      ) * 100;
+      Math.max(1, escDays.slice(0, -3).reduce((s, e) => s + e.chats_handled + e.emails_handled, 0)) * 100;
     if (recentEscRate > olderEscRate + 3) {
       const title = 'Escalation rate is increasing';
       if (!existingInsightTitles.has(title)) {
@@ -107,15 +98,10 @@ export function generateRuleBasedInsights(
     }
   }
 
-  // 5. Mood-performance correlation
   const moodWithEntries = moodCheckins.filter((m) => entries[m.entry_date]);
   if (moodWithEntries.length >= 4) {
-    const goodMoodDays = moodWithEntries.filter(
-      (m) => m.mood === 'great' || m.mood === 'good',
-    );
-    const stressedMoodDays = moodWithEntries.filter(
-      (m) => m.mood === 'stressed' || m.mood === 'overwhelmed',
-    );
+    const goodMoodDays = moodWithEntries.filter((m) => m.mood === 'great' || m.mood === 'good');
+    const stressedMoodDays = moodWithEntries.filter((m) => m.mood === 'stressed' || m.mood === 'overwhelmed');
     if (goodMoodDays.length >= 2 && stressedMoodDays.length >= 1) {
       const goodScores = goodMoodDays
         .map((m) => computeWeightedGrade([entries[m.entry_date]], targets).score)
@@ -144,18 +130,16 @@ export function generateRuleBasedInsights(
     }
   }
 
-  // 6. Task hours backlog
-  const recentEntries = entryList.slice(-7);
-  const totalLogged = recentEntries.reduce((s, e) => s + e.task_hours_logged, 0);
-  const totalSubmitted = recentEntries.reduce((s, e) => s + e.task_hours_submitted, 0);
-  if (totalLogged - totalSubmitted > 5) {
-    const title = 'Task hours backlog growing';
+  const pendingTodos = tasks.filter((t) => t.status === 'pending');
+  const pendingHours = pendingTodos.reduce((s, t) => s + (t.task_hours ?? 0), 0);
+  if (pendingTodos.length >= 2 || pendingHours >= 2) {
+    const title = 'Shift todos still open';
     if (!existingInsightTitles.has(title)) {
       insights.push({
         id: genId(),
         insight_type: 'pattern',
         title,
-        body: `You have ${(totalLogged - totalSubmitted).toFixed(1)} unsubmitted task hours from the last 7 days. Submit them promptly to avoid losing track.`,
+        body: `You have ${pendingTodos.length} open shift todos (${pendingHours.toFixed(1)}h). Pending hours do not count toward productivity until they are submitted.`,
         severity: 'warning',
         dismissed: false,
         created_at: new Date().toISOString(),
@@ -171,11 +155,9 @@ export function computeReflectionStreak(reflections: Record<string, Reflection>)
   if (dates.length === 0) return 0;
 
   let streak = 0;
-  const today = new Date();
+  const today = todayLocal();
   for (let i = 0; i < 365; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = addDays(today, -i);
     if (reflections[dateStr]) {
       streak++;
     } else if (i > 0) {
@@ -198,7 +180,6 @@ export function checkAchievements(
   const journalCount = journal.length;
   const moodCount = moodCheckins.length;
 
-  // First reflection
   if (reflectionCount >= 1 && !existingAchievements.has('first_reflection')) {
     unlocked.push({
       achievement_key: 'first_reflection',
@@ -207,7 +188,6 @@ export function checkAchievements(
     });
   }
 
-  // 3-day streak
   if (computeReflectionStreak(reflections) >= 3 && !existingAchievements.has('streak_3')) {
     unlocked.push({
       achievement_key: 'streak_3',
@@ -216,7 +196,6 @@ export function checkAchievements(
     });
   }
 
-  // 7-day streak
   if (computeReflectionStreak(reflections) >= 7 && !existingAchievements.has('streak_7')) {
     unlocked.push({
       achievement_key: 'streak_7',
@@ -225,7 +204,6 @@ export function checkAchievements(
     });
   }
 
-  // First S-tier day
   const sTierDays = Object.values(reflections).filter((r) => r.grade === 'S');
   if (sTierDays.length >= 1 && !existingAchievements.has('first_s_tier')) {
     unlocked.push({
@@ -235,7 +213,6 @@ export function checkAchievements(
     });
   }
 
-  // 10 journal entries
   if (journalCount >= 10 && !existingAchievements.has('journal_10')) {
     unlocked.push({
       achievement_key: 'journal_10',
@@ -244,7 +221,6 @@ export function checkAchievements(
     });
   }
 
-  // 5 mood check-ins
   if (moodCount >= 5 && !existingAchievements.has('mood_5')) {
     unlocked.push({
       achievement_key: 'mood_5',
@@ -253,7 +229,6 @@ export function checkAchievements(
     });
   }
 
-  // 10 days of data
   if (entryCount >= 10 && !existingAchievements.has('data_10')) {
     unlocked.push({
       achievement_key: 'data_10',

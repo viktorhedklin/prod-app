@@ -1,4 +1,15 @@
-import type { DailyEntry, KPITarget, Tier, Thresholds, GradeResult, MetricBreakdown, TaskItem, EscalationItem } from './types';
+import type {
+  DailyEntry,
+  KPITarget,
+  Tier,
+  Thresholds,
+  GradeResult,
+  MetricBreakdown,
+  TaskItem,
+  EscalationItem,
+  ProductivityPoints,
+} from './types';
+import { todayLocal } from './dates';
 
 export const TIER_POINTS: Record<Tier, number> = {
   S: 5,
@@ -9,11 +20,22 @@ export const TIER_POINTS: Record<Tier, number> = {
   PIP: 0,
 };
 
+export function computeProductivityPoints(entry: DailyEntry): ProductivityPoints {
+  const chats = entry.chats_handled || 0;
+  const emails = entry.emails_handled || 0;
+  const notes = (entry.internal_notes || 0) * 0.5;
+  const taskHours = (entry.task_hours_submitted || 0) * 10;
+  return {
+    chats,
+    emails,
+    notes,
+    taskHours,
+    total: chats + emails + notes + taskHours,
+  };
+}
+
 export function computeProductivityComposite(entries: DailyEntry[]): number {
-  return entries.reduce(
-    (sum, e) => sum + e.chats_handled + e.emails_handled + e.seek_feedback * 0.5 + e.task_hours_submitted * 10,
-    0,
-  );
+  return entries.reduce((sum, entry) => sum + computeProductivityPoints(entry).total, 0);
 }
 
 export function computeEscalationRate(entries: DailyEntry[]): number | null {
@@ -43,12 +65,12 @@ export function tierFromValue(
       if (value >= threshold) return tier;
     }
     return 'PIP';
-  } else {
-    for (const [tier, threshold] of tiers) {
-      if (value <= threshold) return tier;
-    }
-    return 'PIP';
   }
+
+  for (const [tier, threshold] of tiers) {
+    if (value <= threshold) return tier;
+  }
+  return 'PIP';
 }
 
 function avgNonNull(values: (number | null)[]): number | null {
@@ -66,18 +88,12 @@ function avgRatings(ratings: number[][]): number | null {
 export function aggregateEntries(entries: DailyEntry[], qaPct: number | null = null): Record<string, number | null> {
   if (entries.length === 0 && qaPct === null) return {};
 
-  const productivity = computeProductivityComposite(entries);
-  const escRate = computeEscalationRate(entries);
-
-  const csatAvg = avgRatings(entries.map((e) => e.csat_ratings));
-  const escAccAvg = avgNonNull(entries.map((e) => e.escalation_accuracy_pct));
-
   return {
-    productivity,
-    csat: csatAvg,
+    productivity: computeProductivityComposite(entries),
+    csat: avgRatings(entries.map((e) => e.csat_ratings)),
     qa: qaPct,
-    esc_rate: escRate,
-    esc_accuracy: escAccAvg,
+    esc_rate: computeEscalationRate(entries),
+    esc_accuracy: avgNonNull(entries.map((e) => e.escalation_accuracy_pct)),
     quiz: 100,
     punctuality: 10,
   };
@@ -128,16 +144,12 @@ export function computeWeightedGrade(
 
   for (const item of breakdown) {
     if (item.tier !== null) {
-      const normalizedWeight = item.weight_used / totalWeight;
-      weightedScore += TIER_POINTS[item.tier] * normalizedWeight;
+      weightedScore += TIER_POINTS[item.tier] * (item.weight_used / totalWeight);
     }
   }
 
   breakdown.sort((a, b) => b.weight_used - a.weight_used);
-
-  const grade = scoreToGrade(weightedScore);
-
-  return { score: weightedScore, grade, breakdown };
+  return { score: weightedScore, grade: scoreToGrade(weightedScore), breakdown };
 }
 
 export function scoreToGrade(score: number): Tier {
@@ -156,12 +168,10 @@ export function computeRollingAverage(
   qaPct: number | null = null,
 ): Array<{ date: string; score: number | null }> {
   const result: Array<{ date: string; score: number | null }> = [];
-  const today = new Date();
+  const today = todayLocal();
 
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = addDaysSafe(today, -i);
     const entry = entries[dateStr];
     if (!entry) {
       result.push({ date: dateStr, score: null });
@@ -174,24 +184,41 @@ export function computeRollingAverage(
   return result;
 }
 
-export function computeTaskHoursBacklog(entries: DailyEntry[]): {
-  logged: number;
-  submitted: number;
-  backlog: number;
+function addDaysSafe(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function computeTaskHoursBacklog(tasks: TaskItem[], date?: string): {
+  pendingHours: number;
+  submittedHours: number;
+  pendingCount: number;
+  submittedCount: number;
 } {
-  const logged = entries.reduce((s, e) => s + e.task_hours_logged, 0);
-  const submitted = entries.reduce((s, e) => s + e.task_hours_submitted, 0);
-  return { logged, submitted, backlog: logged - submitted };
+  const scoped = date ? tasks.filter((t) => t.linked_date === date || t.completion_date === date) : tasks;
+  const pending = scoped.filter((t) => t.status === 'pending');
+  const submitted = scoped.filter((t) => t.status === 'submitted');
+  return {
+    pendingHours: pending.reduce((s, t) => s + (t.task_hours ?? 0), 0),
+    submittedHours: submitted.reduce((s, t) => s + (t.task_hours ?? 0), 0),
+    pendingCount: pending.length,
+    submittedCount: submitted.length,
+  };
 }
 
 export function getOpenShiftItems(
   tasks: TaskItem[],
   escalations: EscalationItem[],
+  date?: string,
 ): { pendingTasks: TaskItem[]; openEscalations: EscalationItem[] } {
   return {
-    pendingTasks: tasks.filter((t) => t.status === 'pending'),
+    pendingTasks: tasks.filter((t) => t.status === 'pending' && (!date || t.linked_date === date || t.completion_date === date)),
     openEscalations: escalations.filter(
-      (e) => e.status === 'open' || e.status === 'escalated',
+      (e) => (e.status === 'open' || e.status === 'escalated') && (!date || e.linked_date === date),
     ),
   };
 }

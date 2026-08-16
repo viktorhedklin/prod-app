@@ -19,6 +19,7 @@ import type {
   QaEntry,
 } from './types';
 import { makeEmptyEntry } from './defaults';
+import { todayLocal } from './dates';
 import {
   loadEntries, saveEntry,
   loadCsatNotes, saveCsatNote, deleteCsatNote,
@@ -62,6 +63,10 @@ interface Toast {
   severity: 'success' | 'info' | 'warning' | 'error';
 }
 
+export type NewTaskInput = Omit<TaskItem, 'task_id' | 'created_at' | 'submitted_at'> & {
+  task_id?: string;
+};
+
 interface AppContextValue extends AppState {
   loading: boolean;
   loadError: string | null;
@@ -69,7 +74,7 @@ interface AppContextValue extends AppState {
   getOrCreateEntry: (date: string) => DailyEntry;
   addCsatNote: (entryDate: string, rating: number, note: string | null) => void;
   removeCsatNote: (id: string) => void;
-  addTask: (task: Omit<TaskItem, 'task_id' | 'created_at' | 'submitted_at'>) => void;
+  addTask: (task: NewTaskInput) => void;
   updateTask: (task_id: string, patch: Partial<TaskItem>) => void;
   removeTask: (task_id: string) => void;
   addEscalation: (esc: Omit<EscalationItem, 'escalation_id' | 'created_at' | 'escalated_at'>) => void;
@@ -110,6 +115,22 @@ const EMPTY_STATE: AppState = {
   dismissedInsightIds: new Set(),
 };
 
+function applyHourDelta(
+  entries: Record<string, DailyEntry>,
+  date: string,
+  delta: number,
+  notify: (message: string, severity?: Toast['severity']) => void,
+): Record<string, DailyEntry> {
+  if (!delta || !date) return entries;
+  const existing = entries[date] ?? makeEmptyEntry(date);
+  const updated = {
+    ...existing,
+    task_hours_submitted: Math.max(0, Number((existing.task_hours_submitted + delta).toFixed(2))),
+  };
+  saveEntry(date, updated).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
+  return { ...entries, [date]: updated };
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AppState>(EMPTY_STATE);
   const [loading, setLoading] = useState(true);
@@ -117,7 +138,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastIdRef = useRef(0);
 
-  // Load all data from Supabase on mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -179,6 +199,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => {
       const existing = prev.entries[date] ?? makeEmptyEntry(date);
       const updated = { ...existing, ...patch };
+      if (patch.internal_notes !== undefined) {
+        updated.seek_feedback = patch.internal_notes;
+      }
       const nextEntries = { ...prev.entries, [date]: updated };
       saveEntry(date, updated).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
       return { ...prev, entries: nextEntries };
@@ -237,18 +260,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [notify]);
 
   const addTask = useCallback(
-    (task: Omit<TaskItem, 'task_id' | 'created_at' | 'submitted_at'>) => {
+    (task: NewTaskInput) => {
       setState((prev) => {
         const counter = prev.taskCounter + 1;
+        const requested = task.task_id?.trim();
+        const taskId = requested && !prev.tasks.some((t) => t.task_id === requested)
+          ? requested
+          : nextTaskId(counter);
         const newTask: TaskItem = {
           ...task,
-          task_id: nextTaskId(counter),
+          task_id: taskId,
+          source_task_id: task.source_task_id ?? requested ?? null,
           created_at: new Date().toISOString(),
           submitted_at: null,
+          status: 'pending',
         };
-        const nextTasks = [newTask, ...prev.tasks];
         saveTask(newTask).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
-        return { ...prev, tasks: nextTasks, taskCounter: counter };
+        return { ...prev, tasks: [newTask, ...prev.tasks], taskCounter: counter };
       });
     },
     [notify],
@@ -259,19 +287,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const task = prev.tasks.find((t) => t.task_id === task_id);
       if (!task) return prev;
       const updated = { ...task, ...patch };
-      const nextTasks = prev.tasks.map((t) =>
-        t.task_id === task_id ? updated : t,
-      );
+      const nextTasks = prev.tasks.map((t) => (t.task_id === task_id ? updated : t));
       saveTask(updated).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
-      return { ...prev, tasks: nextTasks };
+
+      const hours = updated.task_hours ?? 0;
+      const date = updated.linked_date || task.linked_date;
+      let nextEntries = prev.entries;
+      if (hours > 0 && task.status !== updated.status) {
+        if (updated.status === 'submitted') {
+          nextEntries = applyHourDelta(prev.entries, date, hours, notify);
+        } else if (task.status === 'submitted' && updated.status === 'pending') {
+          nextEntries = applyHourDelta(prev.entries, date, -hours, notify);
+        }
+      }
+
+      return { ...prev, tasks: nextTasks, entries: nextEntries };
     });
   }, [notify]);
 
   const removeTask = useCallback((task_id: string) => {
     setState((prev) => {
+      const task = prev.tasks.find((t) => t.task_id === task_id);
       const nextTasks = prev.tasks.filter((t) => t.task_id !== task_id);
       deleteTask(task_id).catch((e) => notify(`Delete failed: ${e.message}`, 'error'));
-      return { ...prev, tasks: nextTasks };
+      let nextEntries = prev.entries;
+      if (task && task.status === 'submitted' && (task.task_hours ?? 0) > 0) {
+        nextEntries = applyHourDelta(prev.entries, task.linked_date, -(task.task_hours ?? 0), notify);
+      }
+      return { ...prev, tasks: nextTasks, entries: nextEntries };
     });
   }, [notify]);
 
@@ -285,21 +328,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           created_at: new Date().toISOString(),
           escalated_at: null,
         };
-        const nextEscalations = [newEsc, ...prev.escalations];
         saveEscalation(newEsc).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
 
-        const today = new Date().toISOString().slice(0, 10);
-        const existing = prev.entries[today] ?? makeEmptyEntry(today);
+        const day = esc.linked_date || todayLocal();
+        const existing = prev.entries[day] ?? makeEmptyEntry(day);
         const updatedEntry = {
           ...existing,
           escalations_raised: existing.escalations_raised + 1,
         };
-        const nextEntries = { ...prev.entries, [today]: updatedEntry };
-        saveEntry(today, updatedEntry).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
+        const nextEntries = { ...prev.entries, [day]: updatedEntry };
+        saveEntry(day, updatedEntry).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
 
         return {
           ...prev,
-          escalations: nextEscalations,
+          escalations: [newEsc, ...prev.escalations],
           escalationCounter: counter,
           entries: nextEntries,
         };
@@ -341,7 +383,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const addMoodCheckIn = useCallback((mood: MoodType, checkinType: 'start' | 'reflection') => {
     setState((prev) => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayLocal();
       const filtered = prev.moodCheckins.filter(
         (m) => !(m.entry_date === today && m.checkin_type === checkinType),
       );
@@ -352,18 +394,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         checkin_type: checkinType,
         created_at: new Date().toISOString(),
       };
-      const nextCheckins = [...filtered, newCheckIn];
       saveMoodCheckIn(newCheckIn).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
-      return { ...prev, moodCheckins: nextCheckins };
+      return { ...prev, moodCheckins: [...filtered, newCheckIn] };
     });
   }, [notify]);
 
   const getMoodForDate = useCallback(
     (date: string, checkinType: 'start' | 'reflection' = 'start'): MoodCheckIn | null => {
-      const found = state.moodCheckins.find(
+      return state.moodCheckins.find(
         (m) => m.entry_date === date && m.checkin_type === checkinType,
-      );
-      return found ?? null;
+      ) ?? null;
     },
     [state.moodCheckins],
   );
@@ -374,9 +414,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...reflection,
         created_at: new Date().toISOString(),
       };
-      const nextReflections = { ...prev.reflections, [date]: full };
       saveReflection(date, full).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
-      return { ...prev, reflections: nextReflections };
+      return { ...prev, reflections: { ...prev.reflections, [date]: full } };
     });
   }, [notify]);
 
@@ -398,9 +437,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           created_at: existing?.created_at ?? now,
           updated_at: now,
         };
-        const nextQa = { ...prev.qaEntries, [weekStart]: full };
         saveQaEntry(weekStart, full).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
-        return { ...prev, qaEntries: nextQa };
+        return { ...prev, qaEntries: { ...prev.qaEntries, [weekStart]: full } };
       });
     },
     [notify],
@@ -422,20 +460,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       created_at: new Date().toISOString(),
     };
     setState((prev) => {
-      const nextJournal = [...prev.journal, newEntry];
       saveJournalEntry(newEntry).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
-      return { ...prev, journal: nextJournal };
+      return { ...prev, journal: [...prev.journal, newEntry] };
     });
     return newEntry;
   }, [notify]);
 
   const updateJournalEntry = useCallback((id: string, patch: Partial<JournalEntry>) => {
     setState((prev) => {
-      const nextJournal = prev.journal.map((j) =>
-        j.id === id ? { ...j, ...patch } : j,
-      );
       updateJournalEntryDb(id, patch).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
-      return { ...prev, journal: nextJournal };
+      return {
+        ...prev,
+        journal: prev.journal.map((j) => (j.id === id ? { ...j, ...patch } : j)),
+      };
     });
   }, [notify]);
 
@@ -447,20 +484,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         dismissed: false,
         created_at: new Date().toISOString(),
       };
-      const nextInsights = [newInsight, ...prev.insights];
       saveInsight(newInsight).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
-      return { ...prev, insights: nextInsights };
+      return { ...prev, insights: [newInsight, ...prev.insights] };
     });
   }, [notify]);
 
   const dismissInsight = useCallback((id: string) => {
     setState((prev) => {
-      const nextInsights = prev.insights.map((i) =>
-        i.id === id ? { ...i, dismissed: true } : i,
-      );
       updateInsightDismissed(id, true).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
-      const nextDismissed = new Set([...prev.dismissedInsightIds, id]);
-      return { ...prev, insights: nextInsights, dismissedInsightIds: nextDismissed };
+      return {
+        ...prev,
+        insights: prev.insights.map((i) => (i.id === id ? { ...i, dismissed: true } : i)),
+        dismissedInsightIds: new Set([...prev.dismissedInsightIds, id]),
+      };
     });
   }, [notify]);
 
@@ -474,9 +510,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         prev.journal,
         prev.moodCheckins,
         existingTitles,
+        prev.tasks,
       );
-
-      if (newInsights.length === 0) return prev;
 
       const newFull: Insight[] = newInsights.map((i) => ({
         ...i,
@@ -488,8 +523,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       for (const insight of newFull) {
         saveInsight(insight).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
       }
-
-      const nextInsights = [...newFull, ...prev.insights];
 
       const newAchievements = checkAchievements(
         prev.reflections,
@@ -511,7 +544,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      return { ...prev, insights: nextInsights, achievements: nextAchievements };
+      if (newFull.length === 0 && newAchievements.length === 0) return prev;
+      return {
+        ...prev,
+        insights: newFull.length ? [...newFull, ...prev.insights] : prev.insights,
+        achievements: nextAchievements,
+      };
     });
   }, [notify]);
 
@@ -522,11 +560,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ...a,
           unlocked_at: new Date().toISOString(),
         }));
-        const nextAchievements = [...newFull, ...prev.achievements];
         for (const a of newFull) {
           saveAchievement(a).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
         }
-        return { ...prev, achievements: nextAchievements };
+        return { ...prev, achievements: [...newFull, ...prev.achievements] };
       });
     },
     [notify],

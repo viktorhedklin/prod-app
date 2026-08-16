@@ -58,6 +58,7 @@ export function makeEmptyEntry(date: string): DailyEntry {
     chats_handled: 0,
     emails_handled: 0,
     seek_feedback: 0,
+    internal_notes: 0,
     tasks_handled: 0,
     task_hours_logged: 0,
     task_hours_submitted: 0,

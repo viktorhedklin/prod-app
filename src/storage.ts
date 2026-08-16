@@ -20,15 +20,52 @@ function genId(): string {
 
 export { genId };
 
-// --- Daily Entries ---
+const TASK_META_RE = /<!--pg:([\s\S]*?)-->/;
+
+function encodeTaskMeta(task: TaskItem, notes: string | null): string | null {
+  const meta = JSON.stringify({
+    completion_date: task.completion_date,
+    source_task_id: task.source_task_id,
+  });
+  const clean = (notes ?? '').replace(TASK_META_RE, '').trim();
+  return clean ? `${clean}\n<!--pg:${meta}-->` : `<!--pg:${meta}-->`;
+}
+
+function decodeTaskMeta(additionalInfo: string | null): {
+  notes: string | null;
+  completion_date: string | null;
+  source_task_id: string | null;
+} {
+  if (!additionalInfo) return { notes: null, completion_date: null, source_task_id: null };
+  const match = additionalInfo.match(TASK_META_RE);
+  if (!match) return { notes: additionalInfo, completion_date: null, source_task_id: null };
+  try {
+    const parsed = JSON.parse(match[1]) as { completion_date?: string | null; source_task_id?: string | null };
+    const notes = additionalInfo.replace(TASK_META_RE, '').trim();
+    return {
+      notes: notes || null,
+      completion_date: parsed.completion_date ?? null,
+      source_task_id: parsed.source_task_id ?? null,
+    };
+  } catch {
+    return { notes: additionalInfo, completion_date: null, source_task_id: null };
+  }
+}
 
 function normalizeEntry(date: string, raw: Record<string, unknown>): DailyEntry {
   const base = makeEmptyEntry(date);
+  const notes =
+    typeof raw.internal_notes === 'number'
+      ? raw.internal_notes
+      : typeof raw.seek_feedback === 'number'
+        ? raw.seek_feedback
+        : base.internal_notes;
   return {
     date,
     chats_handled: typeof raw.chats_handled === 'number' ? raw.chats_handled : base.chats_handled,
     emails_handled: typeof raw.emails_handled === 'number' ? raw.emails_handled : base.emails_handled,
-    seek_feedback: typeof raw.seek_feedback === 'number' ? raw.seek_feedback : base.seek_feedback,
+    seek_feedback: notes,
+    internal_notes: notes,
     tasks_handled: typeof raw.tasks_handled === 'number' ? raw.tasks_handled : base.tasks_handled,
     task_hours_logged: typeof raw.task_hours_logged === 'number' ? raw.task_hours_logged : base.task_hours_logged,
     task_hours_submitted: typeof raw.task_hours_submitted === 'number' ? raw.task_hours_submitted : base.task_hours_submitted,
@@ -49,11 +86,12 @@ export async function loadEntries(): Promise<Record<string, DailyEntry>> {
 }
 
 export async function saveEntry(date: string, entry: DailyEntry): Promise<void> {
-  const { error } = await supabase.from('daily_entries').upsert({
+  const payload = {
     date,
     chats_handled: entry.chats_handled,
     emails_handled: entry.emails_handled,
-    seek_feedback: entry.seek_feedback,
+    seek_feedback: entry.internal_notes,
+    internal_notes: entry.internal_notes,
     tasks_handled: entry.tasks_handled,
     task_hours_logged: entry.task_hours_logged,
     task_hours_submitted: entry.task_hours_submitted,
@@ -61,11 +99,17 @@ export async function saveEntry(date: string, entry: DailyEntry): Promise<void> 
     escalations_raised: entry.escalations_raised,
     escalation_accuracy_pct: entry.escalation_accuracy_pct,
     updated_at: new Date().toISOString(),
-  });
+  };
+  const { error } = await supabase.from('daily_entries').upsert(payload);
+  if (error && /internal_notes/.test(error.message)) {
+    const { internal_notes: _unused, ...legacy } = payload;
+    void _unused;
+    const retry = await supabase.from('daily_entries').upsert(legacy);
+    if (retry.error) throw retry.error;
+    return;
+  }
   if (error) throw error;
 }
-
-// --- CSAT Notes ---
 
 export async function loadCsatNotes(): Promise<CsatNote[]> {
   const { data, error } = await supabase.from('csat_notes').select('*').order('created_at', { ascending: false });
@@ -95,28 +139,41 @@ export async function deleteCsatNote(id: string): Promise<void> {
   if (error) throw error;
 }
 
-// --- Tasks ---
+function normalizeTask(r: Record<string, unknown>): TaskItem {
+  const meta = decodeTaskMeta(typeof r.additional_info === 'string' ? r.additional_info : null);
+  const linked = typeof r.linked_date === 'string' ? r.linked_date : '';
+  return {
+    task_id: String(r.task_id),
+    source_task_id:
+      typeof r.source_task_id === 'string' && r.source_task_id
+        ? r.source_task_id
+        : meta.source_task_id,
+    brief_explanation: String(r.brief_explanation ?? ''),
+    submit_to: String(r.submit_to ?? ''),
+    amount: typeof r.amount === 'number' ? r.amount : r.amount == null ? null : Number(r.amount),
+    task_hours: typeof r.task_hours === 'number' ? r.task_hours : r.task_hours == null ? null : Number(r.task_hours),
+    status: r.status === 'submitted' ? 'submitted' : 'pending',
+    created_at: String(r.created_at ?? new Date().toISOString()),
+    submitted_at: typeof r.submitted_at === 'string' ? r.submitted_at : null,
+    linked_date: linked,
+    completion_date:
+      typeof r.completion_date === 'string' && r.completion_date
+        ? r.completion_date
+        : meta.completion_date ?? linked,
+    additional_info: meta.notes,
+  };
+}
 
 export async function loadTasks(): Promise<TaskItem[]> {
   const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((r) => ({
-    task_id: r.task_id,
-    brief_explanation: r.brief_explanation,
-    submit_to: r.submit_to,
-    amount: r.amount,
-    task_hours: r.task_hours,
-    status: r.status,
-    created_at: r.created_at,
-    submitted_at: r.submitted_at,
-    linked_date: r.linked_date,
-    additional_info: r.additional_info,
-  }));
+  return (data ?? []).map((r) => normalizeTask(r as unknown as Record<string, unknown>));
 }
 
 export async function saveTask(task: TaskItem): Promise<void> {
-  const { error } = await supabase.from('tasks').upsert({
+  const full = {
     task_id: task.task_id,
+    source_task_id: task.source_task_id,
     brief_explanation: task.brief_explanation,
     submit_to: task.submit_to,
     amount: task.amount,
@@ -125,8 +182,26 @@ export async function saveTask(task: TaskItem): Promise<void> {
     created_at: task.created_at,
     submitted_at: task.submitted_at,
     linked_date: task.linked_date,
+    completion_date: task.completion_date,
     additional_info: task.additional_info,
-  });
+  };
+  const { error } = await supabase.from('tasks').upsert(full);
+  if (error && /source_task_id|completion_date/.test(error.message)) {
+    const retry = await supabase.from('tasks').upsert({
+      task_id: task.task_id,
+      brief_explanation: task.brief_explanation,
+      submit_to: task.submit_to,
+      amount: task.amount,
+      task_hours: task.task_hours,
+      status: task.status,
+      created_at: task.created_at,
+      submitted_at: task.submitted_at,
+      linked_date: task.linked_date,
+      additional_info: encodeTaskMeta(task, task.additional_info),
+    });
+    if (retry.error) throw retry.error;
+    return;
+  }
   if (error) throw error;
 }
 
@@ -134,8 +209,6 @@ export async function deleteTask(task_id: string): Promise<void> {
   const { error } = await supabase.from('tasks').delete().eq('task_id', task_id);
   if (error) throw error;
 }
-
-// --- Escalations ---
 
 export async function loadEscalations(): Promise<EscalationItem[]> {
   const { data, error } = await supabase.from('escalations').select('*').order('created_at', { ascending: false });
@@ -173,8 +246,6 @@ export async function deleteEscalation(escalation_id: string): Promise<void> {
   if (error) throw error;
 }
 
-// --- KPI Targets ---
-
 export async function loadTargets(): Promise<KPITarget[]> {
   const { data, error } = await supabase.from('kpi_targets').select('*');
   if (error) throw error;
@@ -200,8 +271,6 @@ export async function saveTargets(targets: KPITarget[]): Promise<void> {
   if (error) throw error;
 }
 
-// --- Mood Check-ins ---
-
 export async function loadMoodCheckins(): Promise<MoodCheckIn[]> {
   const { data, error } = await supabase.from('mood_checkins').select('*').order('created_at', { ascending: false });
   if (error) throw error;
@@ -224,8 +293,6 @@ export async function saveMoodCheckIn(checkin: MoodCheckIn): Promise<void> {
   });
   if (error) throw error;
 }
-
-// --- Reflections ---
 
 export async function loadReflections(): Promise<Record<string, Reflection>> {
   const { data, error } = await supabase.from('reflections').select('*');
@@ -259,8 +326,6 @@ export async function saveReflection(date: string, reflection: Reflection): Prom
   });
   if (error) throw error;
 }
-
-// --- Journal ---
 
 export async function loadJournal(): Promise<JournalEntry[]> {
   const { data, error } = await supabase.from('journal_entries').select('*').order('created_at', { ascending: true });
@@ -297,8 +362,6 @@ export async function updateJournalEntryDb(id: string, patch: Partial<JournalEnt
   if (error) throw error;
 }
 
-// --- Insights ---
-
 export async function loadInsights(): Promise<Insight[]> {
   const { data, error } = await supabase.from('insights').select('*').order('created_at', { ascending: false });
   if (error) throw error;
@@ -331,8 +394,6 @@ export async function updateInsightDismissed(id: string, dismissed: boolean): Pr
   if (error) throw error;
 }
 
-// --- Achievements ---
-
 export async function loadAchievements(): Promise<Achievement[]> {
   const { data, error } = await supabase.from('achievements').select('*').order('unlocked_at', { ascending: false });
   if (error) throw error;
@@ -354,8 +415,6 @@ export async function saveAchievement(a: Achievement): Promise<void> {
   if (error) throw error;
 }
 
-// --- AI Engine API Key (stays in localStorage — client-side secret) ---
-
 export function loadAiApiKey(): string {
   try {
     return localStorage.getItem('pg_ai_api_key') ?? localStorage.getItem('pg_openai_key') ?? '';
@@ -371,8 +430,6 @@ export function saveAiApiKey(key: string): void {
     // non-fatal
   }
 }
-
-// --- Counters (stored as single-row metadata) ---
 
 export async function loadTaskCounter(): Promise<number> {
   const { data: taskData } = await supabase.from('tasks').select('task_id');

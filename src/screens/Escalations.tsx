@@ -11,10 +11,7 @@ import Divider from '@mui/material/Divider';
 import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
 import type { EscalationItem } from '../types';
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { todayLocal } from '../dates';
 
 type FilterStatus = 'all' | 'open' | 'escalated' | 'resolved';
 
@@ -32,7 +29,7 @@ function EscalationRow({
   onAdvance: () => void;
 }) {
   const isOverdue =
-    esc.status !== 'resolved' && esc.linked_date !== today();
+    esc.status !== 'resolved' && esc.linked_date !== todayLocal();
   const styles = STATUS_STYLES[esc.status] ?? STATUS_STYLES['open'];
 
   return (
@@ -134,7 +131,7 @@ export default function Escalations() {
       escalate_to: form.escalate_to.trim(),
       reason: form.reason.trim(),
       status: 'open',
-      linked_date: today(),
+      linked_date: todayLocal(),
       additional_info: form.additional_info.trim() || null,
     });
 
@@ -158,7 +155,6 @@ export default function Escalations() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
-      {/* New Escalation Form */}
       <StatCard title="New Escalation">
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
@@ -207,7 +203,6 @@ export default function Escalations() {
         </Box>
       </StatCard>
 
-      {/* Escalation List */}
       <Box sx={{ mt: 2 }}>
         <Card elevation={0}>
           <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
