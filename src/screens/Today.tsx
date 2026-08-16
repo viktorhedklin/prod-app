@@ -8,6 +8,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Fade from '@mui/material/Fade';
+import LinearProgress from '@mui/material/LinearProgress';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import StarIcon from '@mui/icons-material/Star';
@@ -15,52 +16,35 @@ import StarBorderIcon from '@mui/icons-material/StarBorder';
 import CloseIcon from '@mui/icons-material/Close';
 import { useApp } from '../AppContext';
 import { makeEmptyEntry } from '../defaults';
-import { computeWeightedGrade, tierFromValue, aggregateEntries, formatTierLabel } from '../grading';
+import { computeWeightedGrade, tierFromValue, aggregateEntries, formatTierLabel, computeProductivityPoints, getOpenShiftItems } from '../grading';
 import StatCard from '../components/StatCard';
 import TierChip from '../components/TierChip';
+import DateNav from '../components/DateNav';
 import type { DailyEntry } from '../types';
 import type { Tier } from '../types';
+import { todayLocal } from '../dates';
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-const STEPPER_FIELDS: Array<{ key: keyof DailyEntry; label: string; min?: number; max?: number }> = [
-  { key: 'chats_handled', label: 'Chats Handled', min: 0 },
-  { key: 'emails_handled', label: 'Emails Handled', min: 0 },
-  { key: 'seek_feedback', label: 'Byseek Feedback Form', min: 0 },
-  { key: 'tasks_handled', label: 'Tasks Handled', min: 0 },
-  { key: 'escalations_raised', label: 'Escalations Raised', min: 0 },
-];
-
-const PRECISE_FIELDS: Array<{
-  key: keyof DailyEntry;
-  label: string;
-  min?: number;
-  max?: number;
-  step?: string;
-  placeholder?: string;
-  adornment?: string;
-}> = [
-  { key: 'task_hours_logged', label: 'Task Hours Logged', min: 0, step: '0.5', adornment: 'h' },
-  { key: 'task_hours_submitted', label: 'Task Hours Submitted', min: 0, step: '0.5', adornment: 'h' },
-  { key: 'escalation_accuracy_pct', label: 'Escalation Accuracy %', min: 0, max: 100, step: '0.1', placeholder: '0–100', adornment: '%' },
+const STEPPER_FIELDS: Array<{ key: keyof DailyEntry; label: string; hint?: string; min?: number }> = [
+  { key: 'chats_handled', label: 'Chats', hint: '1 point each', min: 0 },
+  { key: 'emails_handled', label: 'Emails', hint: '1 point each', min: 0 },
+  { key: 'internal_notes', label: 'Internal Notes', hint: '0.5 points each', min: 0 },
+  { key: 'escalations_raised', label: 'Escalations Raised', hint: 'Used for escalation rate', min: 0 },
 ];
 
 function StepperRow({
   label,
+  hint,
   value,
   onIncrement,
   onDecrement,
   min,
-  max,
 }: {
   label: string;
+  hint?: string;
   value: number;
   onIncrement: () => void;
   onDecrement: () => void;
   min?: number;
-  max?: number;
 }) {
   const [flash, setFlash] = useState<'up' | 'down' | null>(null);
 
@@ -80,13 +64,13 @@ function StepperRow({
         borderBottom: '1px solid',
         borderColor: 'divider',
         '&:last-child': { borderBottom: 'none' },
-        transition: 'background-color 0.2s ease',
         '&:hover': { bgcolor: 'action.hover' },
       }}
     >
-      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-        {label}
-      </Typography>
+      <Box>
+        <Typography variant="body2" sx={{ fontWeight: 500 }}>{label}</Typography>
+        {hint && <Typography variant="caption" color="text.secondary">{hint}</Typography>}
+      </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
         <IconButton
           size="small"
@@ -98,14 +82,6 @@ function StepperRow({
             borderRadius: 1,
             width: 28,
             height: 28,
-            color: 'text.secondary',
-            transition: 'all 0.2s ease',
-            '&:hover': {
-              borderColor: 'error.main',
-              color: 'error.main',
-              bgcolor: 'error.light',
-            },
-            '&:active': { transform: 'scale(0.85)' },
           }}
         >
           <RemoveIcon sx={{ fontSize: 14 }} />
@@ -119,7 +95,6 @@ function StepperRow({
               fontSize: '0.9375rem',
               fontVariantNumeric: 'tabular-nums',
               color: flash === 'up' ? 'success.main' : flash === 'down' ? 'error.main' : 'text.primary',
-              transition: 'color 0.3s ease',
             }}
           >
             {value}
@@ -128,21 +103,12 @@ function StepperRow({
         <IconButton
           size="small"
           onClick={() => handleFlash('up', onIncrement)}
-          disabled={max !== undefined && value >= max}
           sx={{
             border: '1px solid',
             borderColor: 'divider',
             borderRadius: 1,
             width: 28,
             height: 28,
-            color: 'text.secondary',
-            transition: 'all 0.2s ease',
-            '&:hover': {
-              borderColor: 'primary.main',
-              color: 'primary.main',
-              bgcolor: 'primary.main' + '0A',
-            },
-            '&:active': { transform: 'scale(0.85)' },
           }}
         >
           <AddIcon sx={{ fontSize: 14 }} />
@@ -162,18 +128,12 @@ function CsatRatingInput({
   onRemove: (index: number) => void;
 }) {
   const [hovered, setHovered] = useState<number | null>(null);
-
-  const avg =
-    ratings.length > 0
-      ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(2)
-      : '—';
+  const avg = ratings.length > 0 ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(2) : '—';
 
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-          CSAT Ratings
-        </Typography>
+        <Typography variant="body2" sx={{ fontWeight: 500 }}>CSAT Ratings</Typography>
         <Typography variant="caption" color="text.secondary">
           Avg: <strong>{avg}</strong> ({ratings.length} {ratings.length === 1 ? 'response' : 'responses'})
         </Typography>
@@ -186,23 +146,10 @@ function CsatRatingInput({
             onClick={() => onAdd(star)}
             onMouseEnter={() => setHovered(star)}
             onMouseLeave={() => setHovered(null)}
-            sx={{
-              p: 0.5,
-              border: '1px solid',
-              borderColor: 'divider',
-              borderRadius: 1,
-              color: 'text.secondary',
-              transition: 'all 0.2s ease',
-              '&:hover': {
-                borderColor: 'warning.main',
-                color: 'warning.main',
-                bgcolor: 'warning.light',
-                transform: 'scale(1.15)',
-              },
-            }}
+            sx={{ p: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
           >
             {(hovered !== null ? star <= hovered : false) ? (
-              <StarIcon sx={{ fontSize: 18, color: 'warning.main', animation: 'fadeInUp 0.2s ease both' }} />
+              <StarIcon sx={{ fontSize: 18, color: 'warning.main' }} />
             ) : (
               <StarBorderIcon sx={{ fontSize: 18 }} />
             )}
@@ -218,15 +165,7 @@ function CsatRatingInput({
               size="small"
               onDelete={() => onRemove(i)}
               deleteIcon={<CloseIcon sx={{ fontSize: 14 }} />}
-              sx={{
-                bgcolor: 'action.selected',
-                fontSize: '0.75rem',
-                height: 24,
-                animation: 'fadeInUp 0.3s ease both',
-                animationDelay: `${i * 30}ms`,
-                '&:hover': { transform: 'scale(1.05)' },
-                '& .MuiChip-deleteIcon': { fontSize: 14, color: 'text.secondary', '&:hover': { color: 'error.main' } },
-              }}
+              sx={{ bgcolor: 'action.selected', fontSize: '0.75rem', height: 24 }}
             />
           ))}
         </Box>
@@ -251,21 +190,9 @@ function LiveScoreRing({ score }: { score: number | null; grade?: Tier | null })
         value={score === null ? 0 : displayPct}
         size={74}
         thickness={5}
-        sx={{
-          color: 'common.white',
-          opacity: score === null ? 0.35 : 1,
-          transition: 'all 0.8s cubic-bezier(0.4,0,0.2,1)',
-        }}
+        sx={{ color: 'common.white', opacity: score === null ? 0.35 : 1 }}
       />
-      <Typography
-        sx={{
-          position: 'absolute',
-          fontWeight: 700,
-          fontSize: '1.1rem',
-          color: 'common.white',
-          transition: 'all 0.3s ease',
-        }}
-      >
+      <Typography sx={{ position: 'absolute', fontWeight: 700, fontSize: '1.1rem', color: 'common.white' }}>
         {score === null ? '—' : score.toFixed(1)}
       </Typography>
     </Box>
@@ -273,37 +200,47 @@ function LiveScoreRing({ score }: { score: number | null; grade?: Tier | null })
 }
 
 export default function Today() {
-  const { entries, targets, updateEntry, notify, qaEntries } = useApp();
-  const date = today();
+  const { entries, targets, updateEntry, notify, qaEntries, tasks, escalations } = useApp();
+  const [date, setDate] = useState(todayLocal());
   const rawEntry = entries[date] ?? makeEmptyEntry(date);
   const entry: DailyEntry = {
     ...makeEmptyEntry(date),
     ...rawEntry,
+    internal_notes: rawEntry.internal_notes ?? rawEntry.seek_feedback ?? 0,
     csat_ratings: Array.isArray(rawEntry.csat_ratings) ? rawEntry.csat_ratings : [],
   };
+
+  const datesWithData = useMemo(() => {
+    return new Set(
+      Object.values(entries)
+        .filter((e) => e.chats_handled + e.emails_handled + e.internal_notes + e.task_hours_submitted + e.csat_ratings.length > 0)
+        .map((e) => e.date),
+    );
+  }, [entries]);
 
   const latestQa = useMemo(() => {
     const sorted = Object.values(qaEntries).sort((a, b) => b.week_start.localeCompare(a.week_start));
     return sorted[0]?.qa_percentage ?? null;
   }, [qaEntries]);
 
-  const handleStep = (key: keyof DailyEntry, delta: number, min?: number, max?: number) => {
-    const current = entry[key] as number;
+  const { pendingTasks } = useMemo(() => getOpenShiftItems(tasks, escalations, date), [tasks, escalations, date]);
+  const dayTodos = tasks.filter((t) => t.linked_date === date || t.completion_date === date);
+  const todoProgress = dayTodos.length === 0 ? 100 : Math.round((dayTodos.filter((t) => t.status === 'submitted').length / dayTodos.length) * 100);
+
+  const handleStep = (key: keyof DailyEntry, delta: number, min?: number) => {
+    const current = Number(entry[key] ?? 0);
     const next = current + delta;
     if (min !== undefined && next < min) return;
-    if (max !== undefined && next > max) return;
     updateEntry(date, { [key]: next });
   };
 
   const handlePrecise = (key: keyof DailyEntry, raw: string) => {
-    if (raw === '' || raw === null) {
-      updateEntry(date, { [key]: null });
+    if (raw === '') {
+      updateEntry(date, { [key]: key === 'escalation_accuracy_pct' ? null : 0 });
       return;
     }
     const val = parseFloat(raw);
-    if (!isNaN(val)) {
-      updateEntry(date, { [key]: val });
-    }
+    if (!isNaN(val)) updateEntry(date, { [key]: val });
   };
 
   const handleAddCsatRating = (rating: number) => {
@@ -316,33 +253,19 @@ export default function Today() {
   };
 
   const aggregated = useMemo(() => aggregateEntries([entry], latestQa), [entry, latestQa]);
-
+  const points = useMemo(() => computeProductivityPoints(entry), [entry]);
   const liveTiers = useMemo(() => {
     return targets.map((t) => {
       const val = aggregated[t.metric_key];
-      const tier = tierFromValue(
-        typeof val === 'number' ? val : null,
-        t.thresholds,
-        t.direction,
-      );
+      const tier = tierFromValue(typeof val === 'number' ? val : null, t.thresholds, t.direction);
       return { label: t.label, metric_key: t.metric_key, tier };
     });
   }, [aggregated, targets]);
-
   const { score, grade } = useMemo(() => computeWeightedGrade([entry], targets, latestQa), [entry, targets, latestQa]);
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          {formatDate(date)}
-        </Typography>
-        {score !== null && grade !== null && (
-          <Typography variant="body2" color="text.secondary">
-            Today's score: <strong style={{ color: '#2952A3' }}>{score.toFixed(2)}</strong>
-          </Typography>
-        )}
-      </Box>
+      <DateNav date={date} onChange={setDate} datesWithData={datesWithData} />
 
       <Box
         sx={{
@@ -354,38 +277,17 @@ export default function Today() {
           borderRadius: 3,
           bgcolor: 'primary.main',
           color: 'primary.contrastText',
-          overflow: 'hidden',
           position: 'relative',
-          animation: 'fadeInUp 0.4s ease both',
-          '&::after': {
-            content: '""',
-            position: 'absolute',
-            width: 180,
-            height: 180,
-            borderRadius: '50%',
-            right: -70,
-            top: -90,
-            bgcolor: 'rgba(255,255,255,0.08)',
-          },
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            width: 120,
-            height: 120,
-            borderRadius: '50%',
-            right: 20,
-            bottom: -60,
-            bgcolor: 'rgba(255,255,255,0.05)',
-          },
+          overflow: 'hidden',
         }}
       >
         <LiveScoreRing score={score} grade={grade} />
-        <Box sx={{ position: 'relative', zIndex: 1 }}>
+        <Box sx={{ position: 'relative', zIndex: 1, minWidth: 0 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            {score === null ? 'Start your score' : `You're tracking ${formatTierLabel(grade ?? 'PIP')}`}
+            {score === null ? 'Start this day' : `Tracking ${formatTierLabel(grade ?? 'PIP')} · ${points.total.toFixed(1)} prod pts`}
           </Typography>
           <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.78)' }}>
-            Add volume, quality, and customer ratings to bring today to life.
+            chats + emails + notes×0.5 + submitted hours×10. Pending todos do not count.
           </Typography>
         </Box>
       </Box>
@@ -397,68 +299,90 @@ export default function Today() {
               <StepperRow
                 key={f.key}
                 label={f.label}
-                value={entry[f.key] as number}
-                onIncrement={() => handleStep(f.key, 1, f.min, f.max)}
-                onDecrement={() => handleStep(f.key, -1, f.min, f.max)}
+                hint={f.hint}
+                value={Number(entry[f.key] ?? 0)}
+                onIncrement={() => handleStep(f.key, 1, f.min)}
+                onDecrement={() => handleStep(f.key, -1, f.min)}
                 min={f.min}
-                max={f.max}
               />
             ))}
           </StatCard>
+
+          <Box sx={{ mt: 2 }}>
+            <StatCard title="Productivity Breakdown" delay={80}>
+              <PointRow label="Chats" value={points.chats} />
+              <PointRow label="Emails" value={points.emails} />
+              <PointRow label={`Internal notes (${entry.internal_notes} × 0.5)`} value={points.notes} />
+              <PointRow label={`Submitted task hours (${entry.task_hours_submitted} × 10)`} value={points.taskHours} />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 1, mt: 0.5, borderTop: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>Total</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>{points.total.toFixed(1)}</Typography>
+              </Box>
+            </StatCard>
+          </Box>
         </Grid>
 
         <Grid size={{ xs: 12, md: 6 }}>
-          <StatCard title="Precise Metrics" interactive delay={100}>
+          <StatCard title="Quality & Escalation" interactive delay={100}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              {PRECISE_FIELDS.map((f) => {
-                const raw = entry[f.key];
-                const displayVal = raw !== null && raw !== undefined ? String(raw) : '';
-                return (
-                  <TextField
-                    key={f.key}
-                    label={f.label}
-                    type="number"
-                    defaultValue={displayVal}
-                    placeholder={f.placeholder}
-                    inputProps={{ min: f.min, max: f.max, step: f.step }}
-                    onBlur={(e) => handlePrecise(f.key, e.target.value)}
-                    onChange={(e) => handlePrecise(f.key, e.target.value)}
-                    fullWidth
-                    size="small"
-                    slotProps={{
-                      input: f.adornment
-                        ? { endAdornment: <InputAdornment position="end">{f.adornment}</InputAdornment> }
-                        : undefined,
-                    }}
-                  />
-                );
-              })}
+              <TextField
+                label="Escalation Accuracy %"
+                type="number"
+                value={entry.escalation_accuracy_pct ?? ''}
+                placeholder="0–100"
+                onChange={(e) => handlePrecise('escalation_accuracy_pct', e.target.value)}
+                fullWidth
+                size="small"
+                helperText="Per-shift accuracy. Still counted in your grade."
+                slotProps={{ input: { endAdornment: <InputAdornment position="end">%</InputAdornment> } }}
+              />
+              <TextField
+                label="Submitted task hours"
+                type="number"
+                value={entry.task_hours_submitted || ''}
+                onChange={(e) => handlePrecise('task_hours_submitted', e.target.value)}
+                fullWidth
+                size="small"
+                helperText="Only submitted hours count. Completing a Shift Todo adds hours here automatically."
+                slotProps={{ input: { endAdornment: <InputAdornment position="end">h</InputAdornment> } }}
+              />
             </Box>
           </StatCard>
 
           <Box sx={{ mt: 2 }}>
             <StatCard title="CSAT Ratings" interactive delay={150}>
-              <CsatRatingInput
-                ratings={entry.csat_ratings}
-                onAdd={handleAddCsatRating}
-                onRemove={handleRemoveCsatRating}
-              />
+              <CsatRatingInput ratings={entry.csat_ratings} onAdd={handleAddCsatRating} onRemove={handleRemoveCsatRating} />
             </StatCard>
           </Box>
 
           <Box sx={{ mt: 2 }}>
-            <StatCard title="Today's Live Tiers" delay={200}>
+            <StatCard title="Shift Todo Progress" delay={180}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {dayTodos.length === 0 ? 'No todos for this day' : `${dayTodos.length - pendingTasks.length}/${dayTodos.length} submitted`}
+                </Typography>
+                <Typography variant="caption" color={todoProgress === 100 ? 'success.main' : 'warning.main'}>
+                  {todoProgress}%
+                </Typography>
+              </Box>
+              <LinearProgress variant="determinate" value={todoProgress} sx={{ height: 8, borderRadius: 4 }} />
+              {pendingTasks.length > 0 && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                  {pendingTasks.length} open. End Shift stays locked until this is 100%.
+                </Typography>
+              )}
+            </StatCard>
+          </Box>
+
+          <Box sx={{ mt: 2 }}>
+            <StatCard title="Live Tiers" delay={200}>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {liveTiers.map((lt) => (
                   <Box key={lt.metric_key} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
                       {lt.label}:
                     </Typography>
-                    {lt.tier ? (
-                      <TierChip tier={lt.tier} />
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">—</Typography>
-                    )}
+                    {lt.tier ? <TierChip tier={lt.tier} /> : <Typography variant="caption" color="text.secondary">—</Typography>}
                   </Box>
                 ))}
               </Box>
@@ -470,7 +394,13 @@ export default function Today() {
   );
 }
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+function PointRow({ label, value }: { label: string; value: number }) {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.4 }}>
+      <Typography variant="body2" color="text.secondary">{label}</Typography>
+      <Typography variant="body2" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+        {value.toFixed(1)}
+      </Typography>
+    </Box>
+  );
 }
