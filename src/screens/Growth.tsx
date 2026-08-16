@@ -23,6 +23,7 @@ import StatCard from '../components/StatCard';
 import TierChip from '../components/TierChip';
 import { loadAiApiKey, saveAiApiKey } from '../storage';
 import type { JournalCategory, JournalEntry } from '../types';
+import { todayLocal } from '../dates';
 
 const CATEGORY_COLORS: Record<JournalCategory, { bg: string; color: string }> = {
   stress: { bg: '#FBEAE8', color: '#C4554D' },
@@ -32,10 +33,6 @@ const CATEGORY_COLORS: Record<JournalCategory, { bg: string; color: string }> = 
   concern: { bg: '#F3E8F5', color: '#7B3F8E' },
   general: { bg: '#F3F3F3', color: '#6B6B6B' },
 };
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export default function Growth() {
   const {
@@ -84,7 +81,7 @@ export default function Growth() {
     setJournalInput('');
 
     const tempEntry = addJournalEntry({
-      entry_date: today(),
+      entry_date: todayLocal(),
       user_message: msg,
       ai_response: null,
       category: null,
@@ -166,7 +163,6 @@ export default function Growth() {
         </Alert>
       )}
 
-      {/* Stats Row */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid size={{ xs: 6, md: 3 }}>
           <StatCard title="Reflection Streak">
@@ -202,7 +198,6 @@ export default function Growth() {
         </Grid>
       </Grid>
 
-      {/* Insights */}
       {activeInsights.length > 0 && (
         <Box sx={{ mb: 2 }}>
           <StatCard title="Smart Insights">
@@ -235,7 +230,6 @@ export default function Growth() {
       )}
 
       <Grid container spacing={2}>
-        {/* Conversational Journal */}
         <Grid size={{ xs: 12, md: 7 }}>
           <StatCard
             title="Growth Journal"
@@ -312,7 +306,6 @@ export default function Growth() {
             </Box>
           </StatCard>
 
-          {/* Weekly Recap */}
           <Box sx={{ mt: 2 }}>
             <StatCard title="Weekly Recap">
               {weeklyRecap ? (
@@ -340,7 +333,6 @@ export default function Growth() {
           </Box>
         </Grid>
 
-        {/* Achievements + Recent Reflections */}
         <Grid size={{ xs: 12, md: 5 }}>
           <StatCard title="Achievement Badges">
             {achievements.length === 0 ? (
