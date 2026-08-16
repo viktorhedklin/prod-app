@@ -3,6 +3,7 @@ export interface DailyEntry {
   chats_handled: number;
   emails_handled: number;
   seek_feedback: number;
+  internal_notes: number;
   tasks_handled: number;
   task_hours_logged: number;
   task_hours_submitted: number;
@@ -30,6 +31,7 @@ export interface CsatNote {
 
 export interface TaskItem {
   task_id: string;
+  source_task_id: string | null;
   brief_explanation: string;
   submit_to: string;
   amount: number | null;
@@ -38,6 +40,7 @@ export interface TaskItem {
   created_at: string;
   submitted_at: string | null;
   linked_date: string;
+  completion_date: string;
   additional_info: string | null;
 }
 
@@ -141,4 +144,18 @@ export interface Achievement {
   title: string;
   description: string;
   unlocked_at: string;
+}
+
+export interface ProductivityPoints {
+  chats: number;
+  emails: number;
+  notes: number;
+  taskHours: number;
+  total: number;
+}
+
+export interface ShiftSession {
+  date: string;
+  started_at: string | null;
+  ended_at: string | null;
 }
