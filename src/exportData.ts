@@ -2,8 +2,10 @@ import type { DailyEntry, EscalationItem, TaskItem } from './types';
 import { computeProductivityPoints } from './grading';
 
 function csvEscape(value: unknown): string {
-  const text = value == null ? '' : String(value);
-  if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  let text = value == null ? '' : String(value);
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  if (/[",\r\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
   return text;
 }
 
