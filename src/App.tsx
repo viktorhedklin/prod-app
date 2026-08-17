@@ -20,13 +20,13 @@ import Escalations from './screens/Escalations';
 import Reflection from './screens/Reflection';
 import Growth from './screens/Growth';
 import QaReview from './screens/QaReview';
+import BottomNav, { type AppTab } from './components/BottomNav';
+import ErrorBoundary from './components/ErrorBoundary';
 import { todayLocal } from './dates';
 import { getOpenShiftItems } from './grading';
 import { endShiftSession, loadShiftSession, startShiftSession } from './shiftSession';
 
-type Tab = 'dashboard' | 'today' | 'tasks' | 'escalations' | 'reflection' | 'growth' | 'qa';
-
-const TABS: Array<{ id: Tab; label: string }> = [
+const TABS: Array<{ id: AppTab; label: string }> = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'today', label: 'Log' },
   { id: 'tasks', label: 'Shift Todo' },
@@ -45,15 +45,15 @@ function Nav({
   onEndShift,
   shiftEnded,
 }: {
-  active: Tab;
-  onChange: (t: Tab) => void;
+  active: AppTab;
+  onChange: (t: AppTab) => void;
   pendingTasks: number;
   openEscalations: number;
   reflectionMissing: boolean;
   onEndShift: () => void;
   shiftEnded: boolean;
 }) {
-  const badgeFor = (id: Tab): number | 'dot' | null => {
+  const badgeFor = (id: AppTab): number | 'dot' | null => {
     if (id === 'tasks' && pendingTasks > 0) return pendingTasks;
     if (id === 'escalations' && openEscalations > 0) return openEscalations;
     if (id === 'reflection' && reflectionMissing) return 'dot';
@@ -79,31 +79,22 @@ function Nav({
         flexWrap: 'wrap',
       }}
     >
-      <Typography sx={{ fontWeight: 700, fontSize: '0.9375rem', color: 'text.primary', letterSpacing: '-0.01em' }}>
-        Productivity Grader
-      </Typography>
+      <Typography sx={{ fontWeight: 700, fontSize: '0.9375rem' }}>Productivity Grader</Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-        <Box sx={{ display: 'flex', bgcolor: '#F3F3F3', borderRadius: 2, p: 0.375, gap: 0.25, overflowX: 'auto' }}>
+        <Box sx={{ display: { xs: 'none', md: 'flex' }, bgcolor: '#F3F3F3', borderRadius: 2, p: 0.375, gap: 0.25 }}>
           {TABS.map((tab) => {
             const badge = badgeFor(tab.id);
             return (
-              <Badge
-                key={tab.id}
-                badgeContent={badge === 'dot' ? undefined : badge}
-                variant={badge === 'dot' ? 'dot' : 'standard'}
-                color="error"
-                invisible={!badge}
-                overlap="rectangular"
-              >
+              <Badge key={tab.id} badgeContent={badge === 'dot' ? undefined : badge} variant={badge === 'dot' ? 'dot' : 'standard'} color="error" invisible={!badge} overlap="rectangular">
                 <Button
                   onClick={() => onChange(tab.id)}
                   size="small"
                   disableRipple
                   sx={{
-                    px: { xs: 1.25, md: 2 },
+                    px: 2,
                     py: 0.5,
                     minWidth: 0,
-                    fontSize: { xs: '0.75rem', md: '0.8125rem' },
+                    fontSize: '0.8125rem',
                     fontWeight: active === tab.id ? 600 : 400,
                     bgcolor: active === tab.id ? 'background.paper' : 'transparent',
                     color: active === tab.id ? 'primary.main' : 'text.secondary',
@@ -111,10 +102,6 @@ function Nav({
                     borderColor: active === tab.id ? 'divider' : 'transparent',
                     borderRadius: 1.5,
                     boxShadow: active === tab.id ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                    transition: 'all 150ms ease',
-                    '&:hover': {
-                      bgcolor: active === tab.id ? 'background.paper' : 'rgba(0,0,0,0.04)',
-                    },
                   }}
                 >
                   {tab.label}
@@ -123,13 +110,7 @@ function Nav({
             );
           })}
         </Box>
-        <Button
-          size="small"
-          variant={shiftEnded ? 'outlined' : 'contained'}
-          onClick={onEndShift}
-          disabled={shiftEnded}
-          sx={{ fontWeight: 600, flexShrink: 0 }}
-        >
+        <Button size="small" variant={shiftEnded ? 'outlined' : 'contained'} onClick={onEndShift} disabled={shiftEnded} sx={{ fontWeight: 600 }}>
           {shiftEnded ? 'Shift closed' : 'End Shift'}
         </Button>
       </Box>
@@ -139,15 +120,12 @@ function Nav({
 
 function App() {
   const { tasks, escalations, reflections, notify } = useApp();
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
   const [gateOpen, setGateOpen] = useState(false);
   const [shiftTick, setShiftTick] = useState(0);
   const today = todayLocal();
   const shift = useMemo(() => loadShiftSession(today), [today, shiftTick]);
-  const { pendingTasks, openEscalations } = useMemo(
-    () => getOpenShiftItems(tasks, escalations, today),
-    [tasks, escalations, today],
-  );
+  const { pendingTasks, openEscalations } = useMemo(() => getOpenShiftItems(tasks, escalations, today), [tasks, escalations, today]);
   const pendingCount = pendingTasks.length;
   const totalToday = tasks.filter((t) => t.linked_date === today || t.completion_date === today).length;
   const doneCount = Math.max(0, totalToday - pendingCount);
@@ -166,7 +144,7 @@ function App() {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: { xs: 9, md: 0 } }}>
       <Nav
         active={activeTab}
         onChange={setActiveTab}
@@ -177,49 +155,46 @@ function App() {
         shiftEnded={!!shift.ended_at}
       />
       <Box sx={{ py: { xs: 1, md: 1.5 } }}>
-        <Fade in key={activeTab} timeout={250}>
-          <Box>
-            {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
-            {activeTab === 'today' && <Today />}
-            {activeTab === 'tasks' && <Tasks />}
-            {activeTab === 'escalations' && <Escalations />}
-            {activeTab === 'reflection' && <Reflection />}
-            {activeTab === 'qa' && <QaReview />}
-            {activeTab === 'growth' && <Growth />}
-          </Box>
-        </Fade>
+        <ErrorBoundary>
+          <Fade in key={activeTab} timeout={250}>
+            <Box>
+              {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
+              {activeTab === 'today' && <Today />}
+              {activeTab === 'tasks' && <Tasks />}
+              {activeTab === 'escalations' && <Escalations />}
+              {activeTab === 'reflection' && <Reflection />}
+              {activeTab === 'qa' && <QaReview />}
+              {activeTab === 'growth' && <Growth />}
+            </Box>
+          </Fade>
+        </ErrorBoundary>
       </Box>
-
+      <BottomNav
+        active={activeTab}
+        onChange={setActiveTab}
+        pendingTasks={pendingCount}
+        openEscalations={openEscalations.length}
+        reflectionMissing={!reflections[today]}
+      />
       <Dialog open={gateOpen} onClose={() => setGateOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Shift todos must be 100% done</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            {pendingCount} item{pendingCount === 1 ? '' : 's'} still open. Pending task hours do not count toward productivity until you mark them submitted.
+            {pendingCount} item{pendingCount === 1 ? '' : 's'} still open. Pending task hours do not count until submitted.
           </Typography>
           <LinearProgress variant="determinate" value={progress} sx={{ height: 8, borderRadius: 4, mb: 2 }} />
           {pendingTasks.map((task) => (
             <Box key={task.task_id} sx={{ py: 0.75 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {task.brief_explanation}
-              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>{task.brief_explanation}</Typography>
               <Typography variant="caption" color="text.secondary">
                 {task.task_hours ?? 0}h · submit to {task.submit_to} · due {task.completion_date}
-                {task.source_task_id ? ` · ${task.source_task_id}` : ''}
               </Typography>
             </Box>
           ))}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setGateOpen(false)}>Keep working</Button>
-          <Button
-            variant="contained"
-            onClick={() => {
-              setGateOpen(false);
-              setActiveTab('tasks');
-            }}
-          >
-            Open Shift Todo
-          </Button>
+          <Button variant="contained" onClick={() => { setGateOpen(false); setActiveTab('tasks'); }}>Open Shift Todo</Button>
         </DialogActions>
       </Dialog>
     </Box>
