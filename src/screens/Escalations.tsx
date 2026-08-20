@@ -12,10 +12,11 @@ import InboxIcon from '@mui/icons-material/Inbox';
 import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
 import PageHeader from '../components/PageHeader';
+import { todayLocal } from '../dateUtils';
 import type { EscalationItem } from '../types';
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayLocal();
 }
 
 type FilterStatus = 'all' | 'open' | 'escalated' | 'resolved';

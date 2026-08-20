@@ -31,7 +31,7 @@ import {
   formatTierLabel,
   computeWeeklyGrade,
 } from '../grading';
-import { startOfWeekLocal } from '../dateUtils';
+import { startOfWeekLocal, todayLocal, dateKeyFromDate } from '../dateUtils';
 import { generateDailyFocus } from '../ai';
 import { computeReflectionStreak } from '../insights';
 import TierChip from '../components/TierChip';
@@ -43,9 +43,9 @@ function getPeriodEntries(
   period: PeriodType,
 ): import('../types').DailyEntry[] {
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
 
   if (period === 'today') {
+    const todayStr = todayLocal(today);
     const e = entries[todayStr];
     return e ? [e] : [];
   }
@@ -55,7 +55,7 @@ function getPeriodEntries(
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      const ds = d.toISOString().slice(0, 10);
+      const ds = dateKeyFromDate(d);
       if (entries[ds]) result.push(entries[ds]);
     }
     return result;
@@ -66,7 +66,7 @@ function getPeriodEntries(
     for (let i = 29; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      const ds = d.toISOString().slice(0, 10);
+      const ds = dateKeyFromDate(d);
       if (entries[ds]) result.push(entries[ds]);
     }
     return result;
@@ -238,7 +238,7 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
   const [dailyFocus, setDailyFocus] = useState<string | null>(null);
   const [focusLoading, setFocusLoading] = useState(false);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const streak = useMemo(() => computeReflectionStreak(reflections), [reflections]);
   const todayReflection = reflections[today];
   const recentReflections = useMemo(

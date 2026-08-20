@@ -7,6 +7,8 @@ import Button from '@mui/material/Button';
 import Fade from '@mui/material/Fade';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import TodayIcon from '@mui/icons-material/Today';
@@ -18,6 +20,7 @@ import SchoolIcon from '@mui/icons-material/School';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import { lightTheme, darkTheme } from './theme';
 import { AppProvider } from './AppContext';
 import Dashboard from './screens/Dashboard';
@@ -143,49 +146,107 @@ function Nav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) 
 }
 
 function MobileNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
-  const firstSix = TABS.slice(0, 6);
+  const primaryTabs = TABS.slice(0, 6);
+  const overflowTabs = TABS.slice(6);
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const overflowActive = overflowTabs.some((t) => t.id === active);
+
+  const handlePick = (id: Tab) => {
+    onChange(id);
+    setMenuAnchor(null);
+  };
+
   return (
-    <Box
-      component="nav"
-      sx={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 1200,
-        bgcolor: 'background.paper',
-        borderTop: '1px solid',
-        borderColor: 'divider',
-        px: 1,
-        pt: 0.5,
-        pb: 'calc(0.5rem + env(safe-area-inset-bottom))',
-        display: 'flex',
-        justifyContent: 'space-between',
-      }}
-    >
-      {firstSix.map((tab) => {
-        const Icon = tab.icon;
-        const isActive = active === tab.id;
-        return (
-          <Tooltip key={tab.id} title={tab.label} placement="top">
-            <IconButton
-              onClick={() => onChange(tab.id)}
-              aria-label={tab.label}
+    <>
+      <Box
+        component="nav"
+        sx={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1200,
+          bgcolor: 'background.paper',
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          px: 1,
+          pt: 0.5,
+          pb: 'calc(0.5rem + env(safe-area-inset-bottom))',
+          display: 'flex',
+          justifyContent: 'space-between',
+        }}
+      >
+        {primaryTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = active === tab.id;
+          return (
+            <Tooltip key={tab.id} title={tab.label} placement="top">
+              <IconButton
+                onClick={() => onChange(tab.id)}
+                aria-label={tab.label}
+                sx={{
+                  flex: 1,
+                  minWidth: 48,
+                  py: 0.5,
+                  borderRadius: 2,
+                  color: isActive ? 'primary.main' : 'text.secondary',
+                  '&:hover': { bgcolor: 'background.default' },
+                }}
+              >
+                <Icon sx={{ fontSize: 24, transition: 'transform 150ms ease' }} />
+              </IconButton>
+            </Tooltip>
+          );
+        })}
+        <Tooltip title="More" placement="top">
+          <IconButton
+            onClick={(e) => setMenuAnchor(e.currentTarget)}
+            aria-label="More"
+            aria-haspopup="menu"
+            aria-expanded={!!menuAnchor}
+            sx={{
+              flex: 1,
+              minWidth: 48,
+              py: 0.5,
+              borderRadius: 2,
+              color: overflowActive ? 'primary.main' : 'text.secondary',
+              '&:hover': { bgcolor: 'background.default' },
+            }}
+          >
+            <MoreHorizIcon sx={{ fontSize: 24, transition: 'transform 150ms ease' }} />
+          </IconButton>
+        </Tooltip>
+      </Box>
+      <Menu
+        anchorEl={menuAnchor}
+        open={!!menuAnchor}
+        onClose={() => setMenuAnchor(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        slotProps={{ paper: { sx: { minWidth: 180, mt: -0.5 } } }}
+      >
+        {overflowTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = active === tab.id;
+          return (
+            <MenuItem
+              key={tab.id}
+              onClick={() => handlePick(tab.id)}
+              selected={isActive}
               sx={{
-                flex: 1,
-                minWidth: 48,
-                py: 0.5,
-                borderRadius: 2,
-                color: isActive ? 'primary.main' : 'text.secondary',
-                '&:hover': { bgcolor: 'background.default' },
+                gap: 1.5,
+                py: 1,
+                color: isActive ? 'primary.main' : 'text.primary',
+                '& .MuiSvgIcon-root': { fontSize: 20 },
               }}
             >
-              <Icon sx={{ fontSize: 24, transition: 'transform 150ms ease' }} />
-            </IconButton>
-          </Tooltip>
-        );
-      })}
-    </Box>
+              <Icon />
+              {tab.label}
+            </MenuItem>
+          );
+        })}
+      </Menu>
+    </>
   );
 }
 

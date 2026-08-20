@@ -4,6 +4,7 @@ import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import { todayLocal } from './dateUtils';
 import type {
   DailyEntry,
   CsatNote,
@@ -364,7 +365,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const nextEscalations = [newEsc, ...prev.escalations];
         saveEscalation(newEsc).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
 
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayLocal();
         const existing = prev.entries[today] ?? makeEmptyEntry(today);
         const updatedEntry = {
           ...existing,
@@ -417,7 +418,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const addMoodCheckIn = useCallback((mood: MoodType, checkinType: 'start' | 'reflection') => {
     setState((prev) => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayLocal();
       const filtered = prev.moodCheckins.filter(
         (m) => !(m.entry_date === today && m.checkin_type === checkinType),
       );

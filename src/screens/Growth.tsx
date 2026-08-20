@@ -28,6 +28,7 @@ import StatCard from '../components/StatCard';
 import PageHeader from '../components/PageHeader';
 import TierChip from '../components/TierChip';
 import CoachAvatar from '../components/CoachAvatar';
+import { todayLocal } from '../dateUtils';
 import { loadAiApiKey, saveAiApiKey } from '../storage';
 import type { JournalCategory, JournalEntry, KPITarget, Thresholds } from '../types';
 
@@ -41,7 +42,7 @@ const CATEGORY_COLORS: Record<JournalCategory, { bg: string; color: string }> = 
 };
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayLocal();
 }
 
 export default function Growth() {

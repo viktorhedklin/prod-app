@@ -1,4 +1,5 @@
 import type { DailyEntry, KPITarget, Tier, Thresholds, GradeResult, MetricBreakdown, TaskItem, EscalationItem, WeeklyEntry } from './types';
+import { todayLocal, dateKeyFromDate } from './dateUtils';
 
 export const TIER_POINTS: Record<Tier, number> = {
   S: 5,
@@ -159,7 +160,7 @@ export function computeRollingAverage(
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = dateKeyFromDate(d);
     const entry = entries[dateStr];
     if (!entry) {
       result.push({ date: dateStr, score: null });
@@ -216,18 +217,24 @@ export function expandWeeklyEntries(
   weeklyEntries: Record<string, WeeklyEntry>,
 ): Record<string, DailyEntry> {
   const merged: Record<string, DailyEntry> = { ...entries };
+  const today = todayLocal();
   for (const week of Object.values(weeklyEntries)) {
     const days = weekDays(week.week_start);
-    // Distribute the week's CSAT ratings round-robin across the 7 days so the
-    // weekly average stays honest and no single day carries the whole week.
-    const csatByDay: number[][] = Array.from({ length: days.length }, () => []);
+    // Only spread a week's totals over days that have already passed or are
+    // today. Fabricating future days would score unworked time on the trend
+    // and the dashboard's "today" card.
+    const pastDays = days.filter((d) => d <= today);
+    if (pastDays.length === 0) continue;
+    // Distribute the week's CSAT ratings round-robin across the past days so
+    // the weekly average stays honest and no single day carries the whole week.
+    const csatByDay: number[][] = Array.from({ length: pastDays.length }, () => []);
     week.csat_ratings.forEach((rating, i) => {
-      csatByDay[i % days.length].push(rating);
+      csatByDay[i % pastDays.length].push(rating);
     });
-    for (let di = 0; di < days.length; di++) {
-      const day = days[di];
+    const perDay = (v: number) => v / pastDays.length;
+    for (let di = 0; di < pastDays.length; di++) {
+      const day = pastDays[di];
       if (merged[day]) continue;
-      const perDay = (v: number) => v / days.length;
       merged[day] = {
         date: day,
         chats_handled: perDay(week.chats_handled),

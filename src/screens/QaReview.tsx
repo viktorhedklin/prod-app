@@ -36,6 +36,7 @@ import TierChip from '../components/TierChip';
 import PageHeader from '../components/PageHeader';
 import type { Tier } from '../types';
 import { extractQaFromScreenshots } from '../ai';
+import { startOfWeekLocal } from '../dateUtils';
 
 const QA_TARGET = 93;
 
@@ -51,11 +52,7 @@ const CATEGORY_OPTIONS = [
 ];
 
 function getWeekStart(date: Date): string {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  return d.toISOString().slice(0, 10);
+  return startOfWeekLocal(date);
 }
 
 function getWeekLabel(weekStart: string): string {

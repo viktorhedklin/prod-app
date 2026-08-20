@@ -18,10 +18,11 @@ import StatCard from '../components/StatCard';
 import PageHeader from '../components/PageHeader';
 import TierChip from '../components/TierChip';
 import MoodSelector, { moodEmoji, moodLabel } from '../components/MoodSelector';
+import { todayLocal } from '../dateUtils';
 import type { AiTip, MoodType } from '../types';
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayLocal();
 }
 
 type Phase = 'prereq' | 'questions' | 'tips' | 'done';

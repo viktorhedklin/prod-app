@@ -359,17 +359,20 @@ export default function Today() {
 
   const weeklyFields = useMemo(
     () => [
-      { key: 'chats_handled' as const, label: 'Chats Handled (week)' },
-      { key: 'emails_handled' as const, label: 'Emails Handled (week)' },
-      { key: 'tasks_handled' as const, label: 'Tasks Handled (week)' },
-      { key: 'internal_notes' as const, label: 'Internal Notes (week)' },
+      { key: 'chats_handled' as const, label: 'Chats Handled (week)', points: '×1' },
+      { key: 'emails_handled' as const, label: 'Emails Handled (week)', points: '×1' },
+      { key: 'tasks_handled' as const, label: 'Tasks Handled (week)', points: '×1' },
+      { key: 'internal_notes' as const, label: 'Internal Notes (week)', points: '×0.5' },
+      { key: 'task_hours_logged' as const, label: 'Task Hours Logged (week)', points: '×10' },
+      { key: 'task_hours_submitted' as const, label: 'Task Hours Submitted (week)', points: '×10' },
     ],
     [],
   );
 
   const handleWeeklyStep = (key: keyof WeeklyEntry, delta: number) => {
+    const step = key === 'task_hours_logged' || key === 'task_hours_submitted' ? 0.5 : 1;
     const current = (weekly?.[key] as number) ?? 0;
-    const next = Math.max(0, current + delta);
+    const next = Math.max(0, Math.round((current + delta * step) * 10) / 10);
     const base: Omit<WeeklyEntry, 'created_at' | 'updated_at'> = weekly
       ? { ...weekly }
       : {
@@ -516,6 +519,7 @@ export default function Today() {
                   <StepperRow
                     key={f.key}
                     label={f.label}
+                    points={f.points}
                     value={(weekly?.[f.key] as number) ?? 0}
                     onIncrement={() => handleWeeklyStep(f.key, 1)}
                     onDecrement={() => handleWeeklyStep(f.key, -1)}
@@ -524,11 +528,11 @@ export default function Today() {
                 ))}
                 <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
                   <Typography variant="caption" color="text.secondary">
-                    Task hours come from your shift todo list (submitted ×10).
+                    Hour multipliers match the daily scoring (logged and submitted both count ×10).
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
                     {weekly
-                      ? (weekly.chats_handled + weekly.emails_handled + weekly.task_hours_submitted * 10 + weekly.internal_notes * 0.5).toFixed(1)
+                      ? (weekly.chats_handled + weekly.emails_handled + (weekly.task_hours_logged + weekly.task_hours_submitted) * 10 + weekly.internal_notes * 0.5).toFixed(1)
                       : '0.0'} pts
                   </Typography>
                 </Box>

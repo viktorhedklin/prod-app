@@ -1,6 +1,7 @@
 import type { DailyEntry, KPITarget, Insight, Reflection, JournalEntry, MoodCheckIn } from './types';
 import { computeWeightedGrade } from './grading';
 import { genId } from './storage';
+import { dateKeyFromDate } from './dateUtils';
 
 export function generateRuleBasedInsights(
   entries: Record<string, DailyEntry>,
@@ -55,7 +56,7 @@ export function generateRuleBasedInsights(
   for (let i = 0; i < 7; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    recentDays.push(d.toISOString().slice(0, 10));
+    recentDays.push(dateKeyFromDate(d));
   }
   const daysWithEntries = recentDays.filter((d) => entries[d]);
   const daysWithReflections = recentDays.filter((d) => reflections[d]);
@@ -280,7 +281,7 @@ export function computeReflectionStreak(reflections: Record<string, Reflection>)
   for (let i = 0; i < 365; i++) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = dateKeyFromDate(d);
     if (reflections[dateStr]) {
       streak++;
     } else if (i > 0) {
