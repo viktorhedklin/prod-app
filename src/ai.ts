@@ -3,7 +3,41 @@ import { aggregateEntries, tierFromValue, formatTierLabel } from './grading';
 import { loadAiApiKey, loadCoachProfile } from './storage';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'anthropic/claude-sonnet-4.6';
+// Free OpenRouter models: text coaching and vision QA extraction.
+const MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+const VISION_MODEL = 'nvidia/nemotron-nano-12b-v2-vl:free';
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 5000;
+
+// Free models are served from a shared upstream pool and can return 429
+// "rate-limited" errors. Retry a couple of times before giving up.
+async function fetchWithRetry(
+  body: Record<string, unknown>,
+): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const apiKey = loadAiApiKey();
+    if (!apiKey) {
+      throw new Error('No AI Engine API key configured. You can add one in the My Growth settings.');
+    }
+    const response = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://prod-app-5ah.pages.dev',
+        'X-Title': APP_TAG,
+      },
+      body: JSON.stringify(body),
+    });
+    if (response.status !== 429) return response;
+    lastError = new Error('AI service is temporarily busy. Try again in a moment.');
+    if (attempt < MAX_RETRIES) {
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    }
+  }
+  throw lastError ?? new Error('AI service is temporarily busy. Try again in a moment.');
+}
 
 interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
@@ -103,25 +137,11 @@ function buildCoachContext(memories?: CoachMemory[]): string {
 }
 
 async function callOpenAI(messages: OpenAIMessage[], temperature: number = 0.7, maxTokens: number = 1200): Promise<string> {
-  const apiKey = loadAiApiKey();
-  if (!apiKey) {
-    throw new Error('No AI Engine API key configured. You can add one in the My Growth settings.');
-  }
-
-  const response = await fetch(OPENROUTER_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://prod-app-5ah.pages.dev',
-      'X-Title': APP_TAG,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-    }),
+  const response = await fetchWithRetry({
+    model: MODEL,
+    messages,
+    temperature,
+    max_tokens: maxTokens,
   });
 
   if (!response.ok) {
@@ -152,25 +172,11 @@ async function callOpenAIVision(
   temperature: number = 0.3,
   maxTokens: number = 800,
 ): Promise<string> {
-  const apiKey = loadAiApiKey();
-  if (!apiKey) {
-    throw new Error('No AI Engine API key configured. You can add one in the My Growth settings.');
-  }
-
-  const response = await fetch(OPENROUTER_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://prod-app-5ah.pages.dev',
-      'X-Title': APP_TAG,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-    }),
+  const response = await fetchWithRetry({
+    model: VISION_MODEL,
+    messages,
+    temperature,
+    max_tokens: maxTokens,
   });
 
   if (!response.ok) {
