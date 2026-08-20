@@ -369,10 +369,12 @@ export async function saveAchievement(a: Achievement): Promise<void> {
 
 export function loadAiApiKey(): string {
   try {
-    return localStorage.getItem('pg_ai_api_key') ?? localStorage.getItem('pg_openai_key') ?? '';
+    const stored = localStorage.getItem('pg_ai_api_key') ?? localStorage.getItem('pg_openai_key') ?? '';
+    if (stored) return stored;
   } catch {
-    return '';
+    // ignore storage errors
   }
+  return import.meta.env.VITE_AI_API_KEY ?? '';
 }
 
 export function saveAiApiKey(key: string): void {

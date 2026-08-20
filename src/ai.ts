@@ -2,13 +2,15 @@ import type { DailyEntry, KPITarget, JournalEntry, Reflection, Tier, CoachProfil
 import { aggregateEntries, tierFromValue, formatTierLabel } from './grading';
 import { loadAiApiKey, loadCoachProfile } from './storage';
 
-const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
-const MODEL = 'gpt-4o-mini';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const MODEL = 'anthropic/claude-sonnet-4.6';
 
 interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
+
+const APP_TAG = 'productivity-grader-app';
 
 const COACH_PERSONA = `You are a relentlessly supportive, high-standard performance coach. Your ONLY goal is to make this person successful in their role and build their long-term growth. You push them, encourage them, and keep them motivated. You celebrate real wins, call out patterns honestly, and never let them settle. Be warm but direct, concise, and concrete. When you don't know something about them yet, ask instead of guessing.`;
 
@@ -49,11 +51,13 @@ async function callOpenAI(messages: OpenAIMessage[], temperature: number = 0.7):
     throw new Error('No AI Engine API key configured. You can add one in the My Growth settings.');
   }
 
-  const response = await fetch(OPENAI_URL, {
+  const response = await fetch(OPENROUTER_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://prod-app-5ah.pages.dev',
+      'X-Title': APP_TAG,
     },
     body: JSON.stringify({
       model: MODEL,
@@ -64,7 +68,7 @@ async function callOpenAI(messages: OpenAIMessage[], temperature: number = 0.7):
 
   if (!response.ok) {
     const errorBody = await response.text();
-    let message = `OpenAI request failed (${response.status})`;
+    let message = `AI request failed (${response.status})`;
     try {
       const parsed = JSON.parse(errorBody);
       if (parsed.error?.message) message = parsed.error.message;
@@ -77,7 +81,7 @@ async function callOpenAI(messages: OpenAIMessage[], temperature: number = 0.7):
   const data = await response.json();
   const content = data?.choices?.[0]?.message?.content;
   if (typeof content !== 'string') {
-    throw new Error('OpenAI returned an unexpected response format.');
+    throw new Error('AI provider returned an unexpected response format.');
   }
   return content;
 }
