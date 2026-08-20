@@ -20,7 +20,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useApp } from '../AppContext';
 import { makeEmptyEntry } from '../defaults';
-import { computeWeightedGrade, tierFromValue, aggregateEntries, formatTierLabel, expandWeeklyEntries } from '../grading';
+import { computeWeightedGrade, tierFromValue, aggregateEntries, formatTierLabel, computeWeeklyGrade } from '../grading';
 import StatCard from '../components/StatCard';
 import TierChip from '../components/TierChip';
 import DateNav from '../components/DateNav';
@@ -321,12 +321,12 @@ export default function Today() {
 
   const weeklyTier = useMemo(() => {
     if (!weekly) return null;
-    const merged = expandWeeklyEntries({}, { [weekStart]: weekly });
-    const days = Object.values(merged);
-    if (days.length === 0) return null;
-    const { grade } = computeWeightedGrade(days, targets, latestQa);
+    const realInWeek = Object.entries(entries)
+      .filter(([date]) => date >= weekStart && date <= addDays(weekStart, 6))
+      .map(([, e]) => e);
+    const { grade } = computeWeeklyGrade(weekStart, realInWeek, weekly, targets, latestQa);
     return grade;
-  }, [weekly, weekStart, targets, latestQa]);
+  }, [weekly, weekStart, targets, latestQa, entries]);
 
   const handleStep = (key: keyof DailyEntry, delta: number, min?: number, max?: number) => {
     const current = entry[key] as number;

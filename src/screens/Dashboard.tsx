@@ -30,7 +30,9 @@ import {
   computeTaskHoursBacklog,
   getOpenShiftItems,
   formatTierLabel,
+  computeWeeklyGrade,
 } from '../grading';
+import { startOfWeekLocal } from '../dateUtils';
 import { generateDailyFocus } from '../ai';
 import { computeReflectionStreak } from '../insights';
 import TierChip from '../components/TierChip';
@@ -203,7 +205,7 @@ function MetricBar({ label, value, tier, weight, metricKey }: {
 }
 
 export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboard' | 'today' | 'tasks' | 'escalations' | 'reflection' | 'growth') => void }) {
-  const { entries, tasks, escalations, targets, reflections, qaEntries, coachMemories } = useApp();
+  const { entries, tasks, escalations, targets, reflections, qaEntries, coachMemories, weeklyEntries } = useApp();
   const { updateTask, updateEscalation } = useApp();
   const [period, setPeriod] = useState<PeriodType>('today');
   const [dismissedItems, setDismissedItems] = useState<Set<string>>(new Set());
@@ -240,8 +242,13 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
   );
 
   const { score, grade, breakdown } = useMemo(
-    () => computeWeightedGrade(periodEntries, targets, latestQa),
-    [periodEntries, targets, latestQa],
+    () => {
+      if (period === 'week') {
+        return computeWeeklyGrade(startOfWeekLocal(), getPeriodEntries(entries, 'week'), weeklyEntries[startOfWeekLocal()], targets, latestQa);
+      }
+      return computeWeightedGrade(periodEntries, targets, latestQa);
+    },
+    [period, periodEntries, entries, weeklyEntries, targets, latestQa],
   );
 
   const rollingData = useMemo(
@@ -345,7 +352,10 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
       <Grid container spacing={2} sx={{ mb: 2 }}>
         {(['today', 'week', 'month'] as PeriodType[]).map((p, i) => {
           const pEntries = getPeriodEntries(entries, p);
-          const { score: s, grade: g } = computeWeightedGrade(pEntries, targets, latestQa);
+          const weekCard = p === 'week'
+            ? computeWeeklyGrade(startOfWeekLocal(), pEntries, weeklyEntries[startOfWeekLocal()], targets, latestQa)
+            : null;
+          const { score: s, grade: g } = weekCard ?? computeWeightedGrade(pEntries, targets, latestQa);
           return (
             <Grid size={{ xs: 12, sm: 3 }} key={p}>
               <StatCard title={PERIOD_LABELS[p]} interactive delay={i * 50}>

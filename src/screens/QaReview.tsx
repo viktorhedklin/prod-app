@@ -17,6 +17,10 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import ImageIcon from '@mui/icons-material/Image';
+import CircularProgress from '@mui/material/CircularProgress';
+import CloseIcon from '@mui/icons-material/Close';
 import {
   LineChart,
   Line,
@@ -30,6 +34,7 @@ import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
 import TierChip from '../components/TierChip';
 import type { Tier } from '../types';
+import { extractQaFromScreenshots } from '../ai';
 
 const QA_TARGET = 93;
 
@@ -93,6 +98,9 @@ export default function QaReview() {
   const [pct, setPct] = useState('');
   const [notes, setNotes] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
+  const [pendingScreenshots, setPendingScreenshots] = useState<string[]>([]);
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState('');
 
   const sortedEntries = useMemo(
     () => Object.values(qaEntries).sort((a, b) => b.week_start.localeCompare(a.week_start)),
@@ -179,6 +187,45 @@ export default function QaReview() {
     setCategories((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
     );
+  };
+
+  const handleFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setExtractError('');
+    const readers: Promise<string>[] = [];
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue;
+      readers.push(
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
+          reader.readAsDataURL(file);
+        }),
+      );
+    }
+    Promise.all(readers).then((urls) => {
+      setPendingScreenshots((prev) => [...prev, ...urls].slice(0, 10));
+    });
+  };
+
+  const handleExtract = async () => {
+    if (pendingScreenshots.length === 0) return;
+    setExtracting(true);
+    setExtractError('');
+    try {
+      const result = await extractQaFromScreenshots(pendingScreenshots);
+      setCases(String(result.cases_reviewed));
+      setPct(String(result.qa_percentage));
+      setNotes(result.notes ?? '');
+      const validCats = result.categories.filter((c) => CATEGORY_OPTIONS.includes(c));
+      setCategories((prev) => Array.from(new Set([...prev, ...validCats])));
+      setPendingScreenshots([]);
+    } catch (e) {
+      setExtractError(e instanceof Error ? e.message : 'Could not read the screenshot(s).');
+    } finally {
+      setExtracting(false);
+    }
   };
 
   return (
@@ -332,6 +379,96 @@ export default function QaReview() {
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
             {currentEntry ? `Edit Week of ${getWeekLabel(selectedWeek)}` : `Log QA for Week of ${getWeekLabel(selectedWeek)}`}
           </Typography>
+
+          {/* Screenshot upload → data */}
+          <Box
+            component="label"
+            htmlFor="qa-screenshot-upload"
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              p: 2,
+              mb: 2,
+              borderRadius: 2,
+              border: '1.5px dashed',
+              borderColor: 'primary.main',
+              bgcolor: 'primary.light',
+              cursor: 'pointer',
+              transition: 'background-color 0.15s',
+              '&:hover': { bgcolor: 'primary.light', opacity: 0.85 },
+            }}
+          >
+            <UploadFileIcon sx={{ color: 'primary.main' }} />
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Upload QA report screenshot(s)
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Take a screenshot of your QA results and the app will read the overall score for you.
+              </Typography>
+            </Box>
+          </Box>
+          <input
+            id="qa-screenshot-upload"
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => {
+              handleFiles(e.target.files);
+              e.target.value = '';
+            }}
+          />
+          {pendingScreenshots.length > 0 && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+              {pendingScreenshots.map((url, idx) => (
+                <Box
+                  key={idx}
+                  sx={{ position: 'relative', width: 64, height: 64, borderRadius: 1, overflow: 'hidden' }}
+                >
+                  <img src={url} alt={`QA screenshot ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <IconButton
+                    size="small"
+                    onClick={() =>
+                      setPendingScreenshots((prev) => prev.filter((_, i) => i !== idx))
+                    }
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      right: 0,
+                      bgcolor: 'rgba(0,0,0,0.6)',
+                      color: '#fff',
+                      p: 0.2,
+                      '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' },
+                    }}
+                  >
+                    <CloseIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </Box>
+              ))}
+            </Box>
+          )}
+          {(pendingScreenshots.length > 0 || extracting) && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={extracting ? <CircularProgress size={14} /> : <ImageIcon />}
+                disabled={extracting}
+                onClick={handleExtract}
+                sx={{ fontWeight: 600 }}
+              >
+                {extracting ? 'Reading...' : `Extract QA from ${pendingScreenshots.length} screenshot${pendingScreenshots.length === 1 ? '' : 's'}`}
+              </Button>
+              {extractError && (
+                <Typography variant="caption" color="error.main" sx={{ flex: 1 }}>
+                  {extractError}
+                </Typography>
+              )}
+            </Box>
+          )}
+
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
             <TextField
               label="Cases Reviewed"

@@ -218,7 +218,14 @@ export function expandWeeklyEntries(
   const merged: Record<string, DailyEntry> = { ...entries };
   for (const week of Object.values(weeklyEntries)) {
     const days = weekDays(week.week_start);
-    for (const day of days) {
+    // Distribute the week's CSAT ratings round-robin across the 7 days so the
+    // weekly average stays honest and no single day carries the whole week.
+    const csatByDay: number[][] = Array.from({ length: days.length }, () => []);
+    week.csat_ratings.forEach((rating, i) => {
+      csatByDay[i % days.length].push(rating);
+    });
+    for (let di = 0; di < days.length; di++) {
+      const day = days[di];
       if (merged[day]) continue;
       const perDay = (v: number) => v / days.length;
       merged[day] = {
@@ -230,11 +237,95 @@ export function expandWeeklyEntries(
         task_hours_logged: perDay(week.task_hours_logged),
         task_hours_submitted: perDay(week.task_hours_submitted),
         internal_notes: perDay(week.internal_notes),
-        csat_ratings: week.csat_ratings,
+        csat_ratings: csatByDay[di],
         escalations_raised: perDay(week.escalations_raised),
         escalation_accuracy_pct: week.escalation_accuracy_pct,
       };
     }
   }
   return merged;
+}
+
+// Honest weekly aggregate: if a weekly entry exists for the week, grade from the
+// week's own totals (CSAT averaged across all its ratings, productivity summed,
+// escalation rate computed over the week's volume). Otherwise fall back to the
+// week's real daily entries.
+export function computeWeeklyGrade(
+  _weekStart: string,
+  realEntriesInWeek: DailyEntry[],
+  weeklyEntry: WeeklyEntry | undefined,
+  targets: KPITarget[],
+  qaPct: number | null = null,
+): GradeResult {
+  if (weeklyEntry) {
+    const csatAvg =
+      weeklyEntry.csat_ratings.length > 0
+        ? weeklyEntry.csat_ratings.reduce((a, b) => a + b, 0) / weeklyEntry.csat_ratings.length
+        : null;
+    const totalVolume = weeklyEntry.chats_handled + weeklyEntry.emails_handled;
+    const escRate =
+      totalVolume > 0
+        ? (weeklyEntry.escalations_raised / totalVolume) * 100
+        : null;
+    const aggregate: Record<string, number | null> = {
+      productivity:
+        weeklyEntry.chats_handled +
+        weeklyEntry.emails_handled +
+        weeklyEntry.task_hours_submitted * 10 +
+        weeklyEntry.internal_notes * 0.5,
+      csat: csatAvg,
+      qa: qaPct,
+      esc_rate: escRate,
+      esc_accuracy: weeklyEntry.escalation_accuracy_pct,
+    };
+    return gradeFromAggregate(aggregate, targets);
+  }
+  return computeWeightedGrade(realEntriesInWeek, targets, qaPct);
+}
+
+function gradeFromAggregate(
+  aggregated: Record<string, number | null>,
+  targets: KPITarget[],
+): GradeResult {
+  const breakdown: MetricBreakdown[] = [];
+  let totalWeight = 0;
+  let weightedScore = 0;
+
+  for (const target of targets) {
+    const value = aggregated[target.metric_key] ?? null;
+    const tier = tierFromValue(
+      typeof value === 'number' ? value : null,
+      target.thresholds,
+      target.direction,
+    );
+    if (tier === null) {
+      breakdown.push({
+        label: target.label,
+        metric_key: target.metric_key,
+        aggregated_value: null,
+        tier: null,
+        weight_used: 0,
+      });
+      continue;
+    }
+    totalWeight += target.weight;
+    breakdown.push({
+      label: target.label,
+      metric_key: target.metric_key,
+      aggregated_value: typeof value === 'number' ? value : null,
+      tier,
+      weight_used: target.weight,
+    });
+  }
+
+  if (totalWeight === 0) return { score: null, grade: null, breakdown };
+
+  for (const item of breakdown) {
+    if (item.tier !== null) {
+      const normalizedWeight = item.weight_used / totalWeight;
+      weightedScore += TIER_POINTS[item.tier] * normalizedWeight;
+    }
+  }
+  breakdown.sort((a, b) => b.weight_used - a.weight_used);
+  return { score: weightedScore, grade: scoreToGrade(weightedScore), breakdown };
 }

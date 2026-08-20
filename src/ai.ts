@@ -10,7 +10,54 @@ interface OpenAIMessage {
   content: string;
 }
 
+interface OpenAIVisionMessage {
+  role: 'system' | 'user';
+  content:
+    | string
+    | Array<
+        | { type: 'text'; text: string }
+        | { type: 'image_url'; image_url: { url: string } }
+      >;
+}
+
 const APP_TAG = 'productivity-grader-app';
+
+// The AI sometimes appends follow-up text after the JSON object. Extract the
+// first balanced JSON object and parse just that, ignoring trailing prose.
+function parseJsonObject(raw: string): unknown {
+  const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const start = cleaned.indexOf('{');
+  if (start === -1) {
+    throw new Error('No JSON object found in AI response.');
+  }
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === '{') {
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return JSON.parse(cleaned.slice(start, i + 1));
+      }
+    }
+  }
+  throw new Error('Unbalanced JSON object in AI response.');
+}
 
 const COACH_PERSONA = `You are a relentlessly supportive, high-standard performance coach. Your ONLY goal is to make this person successful in their role and build their long-term growth. You push them, encourage them, and keep them motivated. You celebrate real wins, call out patterns honestly, and never let them settle. Be warm but direct, concise, and concrete. When you don't know something about them yet, ask instead of guessing.`;
 
@@ -85,6 +132,58 @@ async function callOpenAI(messages: OpenAIMessage[], temperature: number = 0.7, 
       if (parsed.error?.message) message = parsed.error.message;
     } catch {
       // keep default message
+    }
+    if (response.status === 402) {
+      throw new Error('AI credits are running low. Add more credits at openrouter.ai/settings/credits to keep using the AI coach.');
+    }
+    throw new Error(message);
+  }
+
+  const data = await response.json();
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content !== 'string') {
+    throw new Error('AI provider returned an unexpected response format.');
+  }
+  return content;
+}
+
+async function callOpenAIVision(
+  messages: OpenAIVisionMessage[],
+  temperature: number = 0.3,
+  maxTokens: number = 800,
+): Promise<string> {
+  const apiKey = loadAiApiKey();
+  if (!apiKey) {
+    throw new Error('No AI Engine API key configured. You can add one in the My Growth settings.');
+  }
+
+  const response = await fetch(OPENROUTER_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://prod-app-5ah.pages.dev',
+      'X-Title': APP_TAG,
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    let message = `AI request failed (${response.status})`;
+    try {
+      const parsed = JSON.parse(errorBody);
+      if (parsed.error?.message) message = parsed.error.message;
+    } catch {
+      // keep default message
+    }
+    if (response.status === 402) {
+      throw new Error('AI credits are running low. Add more credits at openrouter.ai/settings/credits to keep using the AI coach.');
     }
     throw new Error(message);
   }
@@ -190,8 +289,7 @@ You are generating 4-6 thoughtful reflection questions that help them reflect on
   );
 
   try {
-    const cleaned = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const questions = JSON.parse(cleaned);
+    const questions = parseJsonObject(result);
     if (Array.isArray(questions) && questions.every((q) => typeof q === 'string')) {
       return questions.slice(0, 6);
     }
@@ -251,8 +349,7 @@ Generate 3-5 tips. Focus high priority tips on the weakest metrics. Return ONLY 
   );
 
   try {
-    const cleaned = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const parsed = JSON.parse(cleaned);
+    const parsed = parseJsonObject(result) as Record<string, unknown>;
     if (parsed.tips && Array.isArray(parsed.tips) && typeof parsed.summary === 'string') {
       return {
         tips: parsed.tips.slice(0, 5),
@@ -309,8 +406,7 @@ The person is sharing their thoughts, feelings, struggles, strengths, or concern
   );
 
   try {
-    const cleaned = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const parsed = JSON.parse(cleaned);
+    const parsed = parseJsonObject(result) as Record<string, unknown>;
     if (typeof parsed.response === 'string') {
       return {
         response: parsed.response,
@@ -460,8 +556,7 @@ You are a coaching planner. Based on recent performance data AND the person's pr
         0.4,
       );
 
-      const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      const parsed = JSON.parse(cleaned);
+      const parsed = parseJsonObject(response) as Record<string, unknown>;
       if (
         parsed &&
         typeof parsed.focus_area === 'string' &&
@@ -541,8 +636,7 @@ Read the current plan, recent performance, and the person's response. Respond as
         0.5,
       );
 
-      const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      const parsed = JSON.parse(cleaned);
+      const parsed = parseJsonObject(response) as Record<string, unknown>;
       if (typeof parsed.coach_response === 'string') {
         return {
           coach_response: parsed.coach_response,
@@ -621,4 +715,57 @@ export async function generateWeeklyRecap(
     .join('\n');
 
   return { title, body };
+}
+
+export interface QaExtractionResult {
+  qa_percentage: number;
+  cases_reviewed: number;
+  categories: string[];
+  notes: string | null;
+}
+
+// Extract QA overall scores from uploaded QA report screenshots (OCR via vision model).
+export async function extractQaFromScreenshots(
+  imageDataUrls: string[],
+): Promise<QaExtractionResult> {
+  if (imageDataUrls.length === 0) {
+    throw new Error('No screenshots provided.');
+  }
+
+  const content: OpenAIVisionMessage['content'] = [
+    {
+      type: 'text',
+      text: 'These are screenshots of QA quality-assurance review reports. Read ALL of them carefully. Extract the OVERALL QA percentage score and, if visible, the number of cases reviewed and any category names that need improvement. If multiple screenshots show different percentages (e.g. chat vs email), report the OVERALL/combined number if shown; otherwise use the most prominent one and say which in notes. Return ONLY valid JSON with this exact shape: {"qa_percentage": number 0-100, "cases_reviewed": number, "categories": ["..."], "notes": "short note about what the number refers to or null"}. If you cannot find a QA percentage, set qa_percentage to null.',
+    },
+    ...imageDataUrls.map(
+      (url) => ({ type: 'image_url' as const, image_url: { url } }),
+    ),
+  ];
+
+  const response = await callOpenAIVision([
+    {
+      role: 'system',
+      content:
+        'You extract structured QA score data from screenshots. Be precise, read numbers exactly as shown, and return only the requested JSON.',
+    },
+    { role: 'user', content },
+  ]);
+
+  const parsed = parseJsonObject(response) as Record<string, unknown>;
+  if (typeof parsed.qa_percentage !== 'number' || isNaN(parsed.qa_percentage)) {
+    throw new Error('Could not read a QA percentage from the screenshot(s). Try a clearer screenshot.');
+  }
+
+  return {
+    qa_percentage: Math.max(0, Math.min(100, parsed.qa_percentage)),
+    cases_reviewed:
+      typeof parsed.cases_reviewed === 'number' && !isNaN(parsed.cases_reviewed)
+        ? Math.max(0, Math.round(parsed.cases_reviewed))
+        : 0,
+    categories:
+      Array.isArray(parsed.categories)
+        ? parsed.categories.filter((c: unknown): c is string => typeof c === 'string').slice(0, 8)
+        : [],
+    notes: typeof parsed.notes === 'string' && parsed.notes.trim() ? parsed.notes.trim() : null,
+  };
 }
