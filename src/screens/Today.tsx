@@ -18,7 +18,7 @@ import StarBorderIcon from '@mui/icons-material/StarBorder';
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { useApp } from '../AppContext';
+import { useApp } from '../useApp';
 import { makeEmptyEntry } from '../defaults';
 import { computeWeightedGrade, tierFromValue, aggregateEntries, formatTierLabel, computeWeeklyGrade } from '../grading';
 import StatCard from '../components/StatCard';

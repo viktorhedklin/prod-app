@@ -21,7 +21,7 @@ import {
   Area,
   AreaChart,
 } from 'recharts';
-import { useApp } from '../AppContext';
+import { useApp } from '../useApp';
 import type { PeriodType, KPITarget } from '../types';
 import {
   computeWeightedGrade,

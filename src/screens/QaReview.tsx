@@ -30,7 +30,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
-import { useApp } from '../AppContext';
+import { useApp } from '../useApp';
 import StatCard from '../components/StatCard';
 import TierChip from '../components/TierChip';
 import PageHeader from '../components/PageHeader';

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -47,8 +47,9 @@ import {
   checkAchievements,
 } from './insights';
 import { expandWeeklyEntries } from './grading';
+import { AppContext } from './useApp';
 
-interface AppState {
+export interface AppState {
   entries: Record<string, DailyEntry>;
   weeklyEntries: Record<string, WeeklyEntry>;
   csatNotes: CsatNote[];
@@ -75,7 +76,7 @@ interface Toast {
   severity: 'success' | 'info' | 'warning' | 'error';
 }
 
-interface AppContextValue extends AppState {
+export interface AppContextValue extends AppState {
   loading: boolean;
   loadError: string | null;
   updateEntry: (date: string, patch: Partial<DailyEntry>) => void;
@@ -109,8 +110,6 @@ interface AppContextValue extends AppState {
   addAchievements: (achievements: Array<{ achievement_key: string; title: string; description: string }>) => void;
   notify: (message: string, severity?: Toast['severity']) => void;
 }
-
-const AppContext = createContext<AppContextValue | null>(null);
 
 const EMPTY_STATE: AppState = {
   entries: {},
@@ -268,6 +267,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [notify]);
 
+  const adjustEntryHours = useCallback((
+    entries: Record<string, DailyEntry>,
+    date: string,
+    key: 'task_hours_logged' | 'task_hours_submitted',
+    delta: number,
+  ): Record<string, DailyEntry> => {
+    if (delta === 0) return entries;
+    const existing = entries[date] ?? makeEmptyEntry(date);
+    const updated = {
+      ...existing,
+      [key]: Math.max(0, (existing[key] as number) + delta),
+    } as DailyEntry;
+    const nextEntries = { ...entries, [date]: updated };
+    saveEntry(date, updated).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
+    return nextEntries;
+  }, [notify]);
+
   const addTask = useCallback(
     (task: Omit<TaskItem, 'task_id' | 'created_at' | 'submitted_at'>) => {
       setState((prev) => {
@@ -290,7 +306,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return { ...prev, tasks: nextTasks, taskCounter: counter, entries: nextEntries };
       });
     },
-    [notify],
+    [notify, adjustEntryHours],
   );
 
   const updateTask = useCallback((task_id: string, patch: Partial<TaskItem>) => {
@@ -326,7 +342,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       return { ...prev, tasks: nextTasks, entries: nextEntries };
     });
-  }, [notify]);
+  }, [notify, adjustEntryHours]);
 
   const removeTask = useCallback((task_id: string) => {
     setState((prev) => {
@@ -350,7 +366,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return { ...prev, tasks: nextTasks, entries: nextEntries };
     });
-  }, [notify]);
+  }, [notify, adjustEntryHours]);
 
   const addEscalation = useCallback(
     (esc: Omit<EscalationItem, 'escalation_id' | 'created_at' | 'escalated_at'>) => {
@@ -491,23 +507,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return { ...prev, qaEntries: nextQa };
     });
   }, [notify]);
-
-  const adjustEntryHours = (
-    entries: Record<string, DailyEntry>,
-    date: string,
-    key: 'task_hours_logged' | 'task_hours_submitted',
-    delta: number,
-  ): Record<string, DailyEntry> => {
-    if (delta === 0) return entries;
-    const existing = entries[date] ?? makeEmptyEntry(date);
-    const updated = {
-      ...existing,
-      [key]: Math.max(0, (existing[key] as number) + delta),
-    } as DailyEntry;
-    const nextEntries = { ...entries, [date]: updated };
-    saveEntry(date, updated).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
-    return nextEntries;
-  };
 
   const upsertCoachingPlan = useCallback((plan: CoachingPlan) => {
     setState((prev) => {
@@ -780,10 +779,4 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ))}
     </AppContext.Provider>
   );
-}
-
-export function useApp(): AppContextValue {
-  const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useApp must be used within AppProvider');
-  return ctx;
 }

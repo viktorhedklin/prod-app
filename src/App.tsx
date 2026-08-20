@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
@@ -23,14 +23,15 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import { lightTheme, darkTheme } from './theme';
 import { AppProvider } from './AppContext';
-import Dashboard from './screens/Dashboard';
-import Today from './screens/Today';
-import Tasks from './screens/Tasks';
-import Escalations from './screens/Escalations';
-import Reflection from './screens/Reflection';
-import Growth from './screens/Growth';
-import QaReview from './screens/QaReview';
-import Coaching from './screens/Coaching';
+
+const Dashboard = lazy(() => import('./screens/Dashboard'));
+const Today = lazy(() => import('./screens/Today'));
+const Tasks = lazy(() => import('./screens/Tasks'));
+const Escalations = lazy(() => import('./screens/Escalations'));
+const Reflection = lazy(() => import('./screens/Reflection'));
+const Growth = lazy(() => import('./screens/Growth'));
+const QaReview = lazy(() => import('./screens/QaReview'));
+const Coaching = lazy(() => import('./screens/Coaching'));
 
 type Tab = 'dashboard' | 'today' | 'tasks' | 'escalations' | 'reflection' | 'growth' | 'qa' | 'coaching';
 
@@ -290,14 +291,46 @@ function App() {
         <Box sx={{ py: { xs: 2, md: 2.5 }, px: { xs: 1.5, md: 0 } }}>
           <Fade in key={activeTab} timeout={250}>
             <Box>
-              {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
-              {activeTab === 'today' && <Today />}
-              {activeTab === 'tasks' && <Tasks />}
-              {activeTab === 'escalations' && <Escalations />}
-              {activeTab === 'reflection' && <Reflection />}
-              {activeTab === 'qa' && <QaReview />}
-              {activeTab === 'coaching' && <Coaching />}
-              {activeTab === 'growth' && <Growth />}
+              {activeTab === 'dashboard' && (
+                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
+                  <Dashboard onNavigate={setActiveTab} />
+                </Suspense>
+              )}
+              {activeTab === 'today' && (
+                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
+                  <Today />
+                </Suspense>
+              )}
+              {activeTab === 'tasks' && (
+                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
+                  <Tasks />
+                </Suspense>
+              )}
+              {activeTab === 'escalations' && (
+                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
+                  <Escalations />
+                </Suspense>
+              )}
+              {activeTab === 'reflection' && (
+                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
+                  <Reflection />
+                </Suspense>
+              )}
+              {activeTab === 'qa' && (
+                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
+                  <QaReview />
+                </Suspense>
+              )}
+              {activeTab === 'coaching' && (
+                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
+                  <Coaching />
+                </Suspense>
+              )}
+              {activeTab === 'growth' && (
+                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
+                  <Growth />
+                </Suspense>
+              )}
             </Box>
           </Fade>
         </Box>

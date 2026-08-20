@@ -20,7 +20,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import { useApp } from '../AppContext';
+import { useApp } from '../useApp';
 import { computeRollingAverage } from '../grading';
 import { generateJournalResponse, generateWeeklyRecap } from '../ai';
 import { computeReflectionStreak } from '../insights';

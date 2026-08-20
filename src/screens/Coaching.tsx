@@ -19,7 +19,7 @@ import ScheduleIcon from '@mui/icons-material/Schedule';
 import KeyIcon from '@mui/icons-material/Key';
 import WavingHandIcon from '@mui/icons-material/WavingHand';
 import EditIcon from '@mui/icons-material/Edit';
-import { useApp } from '../AppContext';
+import { useApp } from '../useApp';
 import StatCard from '../components/StatCard';
 import PageHeader from '../components/PageHeader';
 import CoachAvatar from '../components/CoachAvatar';

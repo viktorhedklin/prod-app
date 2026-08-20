@@ -11,7 +11,7 @@ import Fade from '@mui/material/Fade';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import { useApp } from '../AppContext';
+import { useApp } from '../useApp';
 import { computeWeightedGrade, formatTierLabel, computeRollingAverage, computeTaskHoursBacklog, getOpenShiftItems } from '../grading';
 import { generateReflectionQuestions, generateReflectionTips } from '../ai';
 import StatCard from '../components/StatCard';

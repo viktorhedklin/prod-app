@@ -52,13 +52,13 @@ export function tierFromValue(
   }
 }
 
-function avgNonNull(values: (number | null)[]): number | null {
+export function avgNonNull(values: (number | null)[]): number | null {
   const valid = values.filter((v): v is number => v !== null && !isNaN(v));
   if (valid.length === 0) return null;
   return valid.reduce((a, b) => a + b, 0) / valid.length;
 }
 
-function avgRatings(ratings: number[][]): number | null {
+export function avgRatings(ratings: number[][]): number | null {
   const all = ratings.flat();
   if (all.length === 0) return null;
   return all.reduce((a, b) => a + b, 0) / all.length;
