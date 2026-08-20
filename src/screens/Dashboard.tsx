@@ -22,7 +22,7 @@ import {
   AreaChart,
 } from 'recharts';
 import { useApp } from '../AppContext';
-import type { PeriodType } from '../types';
+import type { PeriodType, KPITarget } from '../types';
 import {
   computeWeightedGrade,
   computeRollingAverage,
@@ -36,6 +36,7 @@ import { generateDailyFocus } from '../ai';
 import { computeReflectionStreak } from '../insights';
 import TierChip from '../components/TierChip';
 import StatCard from '../components/StatCard';
+import EmptyState from '../components/EmptyState';
 import type { Tier } from '../types';
 
 function getPeriodEntries(
@@ -76,12 +77,12 @@ function getPeriodEntries(
 }
 
 const GRADE_STYLES: Record<Tier, { bg: string; color: string }> = {
-  S: { bg: '#EAF6EF', color: '#15803D' },
-  A_plus: { bg: '#EAF6EF', color: '#15803D' },
-  A: { bg: '#EAF6EF', color: '#15803D' },
-  B: { bg: '#FEF3C7', color: '#B45309' },
-  C: { bg: '#FDECEC', color: '#B91C1C' },
-  PIP: { bg: '#FDECEC', color: '#B91C1C' },
+  S: { bg: 'success.light', color: 'success.main' },
+  A_plus: { bg: 'success.light', color: 'success.main' },
+  A: { bg: 'success.light', color: 'success.main' },
+  B: { bg: 'warning.light', color: 'warning.main' },
+  C: { bg: 'error.light', color: 'error.main' },
+  PIP: { bg: 'error.light', color: 'error.main' },
 };
 
 function ScoreRing({ score, grade, size = 72, light = false }: { score: number | null; grade: Tier | null; size?: number; light?: boolean }) {
@@ -186,15 +187,24 @@ function useCountUp(target: number, duration = 700) {
   return display;
 }
 
-function MetricBar({ label, value, tier, weight, metricKey }: {
+function MetricBar({ label, value, tier, weight, metricKey, target }: {
   label: string;
   value: number | null;
   tier: Tier | null;
   weight: number;
   metricKey: string;
+  target?: KPITarget;
 }) {
-  const tierStyles = tier ? GRADE_STYLES[tier] : { bg: '#F5F5F5', color: '#6B6B6B' };
-  const pct = tier ? Math.min((value ?? 0) / 5 * 100, 100) : 0;
+  const tierStyles = tier ? GRADE_STYLES[tier] : { bg: 'action.hover', color: 'text.secondary' };
+  const pct = useMemo(() => {
+    if (value === null || !target) return 0;
+    const S = target.thresholds.S;
+    if (!S) return 0;
+    if (target.direction === 'lower_is_better') {
+      return Math.min((S / Math.max(value, 0.001)) * 100, 100);
+    }
+    return Math.min((value / S) * 100, 100);
+  }, [value, target]);
   return (
     <Box sx={{ mb: 1.5, '&:last-child': { mb: 0 } }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
@@ -609,9 +619,7 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
           <Grid size={{ xs: 12, md: 7 }}>
             <StatCard title="Metric Breakdown" delay={400}>
               {breakdown.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  No data for this period yet.
-                </Typography>
+                <EmptyState title="No data for this period yet." />
               ) : (
                 <Box>
                   {breakdown.map((row) => (
@@ -622,6 +630,7 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
                       tier={row.tier}
                       weight={row.weight_used}
                       metricKey={row.metric_key}
+                      target={targets.find((t) => t.metric_key === row.metric_key)}
                     />
                   ))}
                 </Box>

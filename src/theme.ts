@@ -1,5 +1,34 @@
 import { createTheme } from '@mui/material/styles';
-import type { ThemeOptions } from '@mui/material/styles';
+import type { ThemeOptions, Theme } from '@mui/material/styles';
+import type { Tier } from './types';
+
+export type StatusTone = 'ok' | 'warn' | 'danger' | 'neutral';
+
+export const TIER_TONE: Record<Tier, StatusTone> = {
+  S: 'ok',
+  A_plus: 'ok',
+  A: 'ok',
+  B: 'warn',
+  C: 'danger',
+  PIP: 'danger',
+};
+
+export function toneStyle(tone: StatusTone, theme: Theme): { bg: string; color: string; border: string } {
+  if (tone === 'neutral') {
+    return {
+      bg: theme.palette.action.selected,
+      color: theme.palette.text.secondary,
+      border: theme.palette.divider,
+    };
+  }
+  const key = tone === 'ok' ? 'success' : tone === 'warn' ? 'warning' : 'error';
+  const p = theme.palette[key];
+  return {
+    bg: p.light,
+    color: p.main,
+    border: theme.palette.mode === 'dark' ? `${p.main}55` : `${p.main}38`,
+  };
+}
 
 // Deep Teal brand palette (option A)
 const BRAND = {

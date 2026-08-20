@@ -12,6 +12,9 @@ import InboxIcon from '@mui/icons-material/Inbox';
 import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
 import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
+import { useTheme } from '@mui/material/styles';
+import { toneStyle } from '../theme';
 import { todayLocal } from '../dateUtils';
 import type { EscalationItem } from '../types';
 
@@ -21,10 +24,10 @@ function today(): string {
 
 type FilterStatus = 'all' | 'open' | 'escalated' | 'resolved';
 
-const STATUS_STYLES: Record<string, { bg: string; color: string }> = {
-  open: { bg: '#FEF3C7', color: '#B45309' },
-  escalated: { bg: '#EAF6EF', color: '#15803D' },
-  resolved: { bg: '#F0F0F0', color: '#5D6B68' },
+const STATUS_TONE: Record<string, 'ok' | 'warn' | 'danger' | 'neutral'> = {
+  open: 'warn',
+  escalated: 'ok',
+  resolved: 'neutral',
 };
 
 function EscalationRow({
@@ -36,7 +39,8 @@ function EscalationRow({
 }) {
   const isOverdue =
     esc.status !== 'resolved' && esc.linked_date !== today();
-  const styles = STATUS_STYLES[esc.status] ?? STATUS_STYLES['open'];
+  const theme = useTheme();
+  const styles = toneStyle(STATUS_TONE[esc.status] ?? 'warn', theme);
 
   return (
     <Box
@@ -264,26 +268,15 @@ export default function Escalations() {
             </Box>
             <Divider sx={{ mb: 1 }} />
             {filtered.length === 0 ? (
-              <Box
-                sx={{
-                  py: 4,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 1,
-                  textAlign: 'center',
-                }}
-              >
-                <InboxIcon sx={{ fontSize: 40, color: 'text.disabled' }} />
-                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-                  No escalations found.
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 320 }}>
-                  {filter === 'all'
+              <EmptyState
+                icon={<InboxIcon sx={{ fontSize: 40 }} />}
+                title="No escalations found."
+                hint={
+                  filter === 'all'
                     ? 'Escalations you log here will appear in this list.'
-                    : 'Try a different filter, or add a new escalation above.'}
-                </Typography>
-              </Box>
+                    : 'Try a different filter, or add a new escalation above.'
+                }
+              />
             ) : (
               filtered.map((esc) => (
                 <EscalationRow

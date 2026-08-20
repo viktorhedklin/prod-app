@@ -53,7 +53,7 @@ export function tierFromValue(
 }
 
 function avgNonNull(values: (number | null)[]): number | null {
-  const valid = values.filter((v): v is number => v !== null && !isNaN(v) && v !== 0);
+  const valid = values.filter((v): v is number => v !== null && !isNaN(v));
   if (valid.length === 0) return null;
   return valid.reduce((a, b) => a + b, 0) / valid.length;
 }

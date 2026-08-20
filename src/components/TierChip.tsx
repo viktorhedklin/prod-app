@@ -1,23 +1,17 @@
 import Chip from '@mui/material/Chip';
+import { useTheme } from '@mui/material/styles';
 import type { Tier } from '../types';
 import { formatTierLabel } from '../grading';
+import { TIER_TONE, toneStyle } from '../theme';
 
 interface Props {
   tier: Tier;
   size?: 'small' | 'medium';
 }
 
-const TIER_STYLES: Record<Tier, { bg: string; color: string; border: string }> = {
-  S: { bg: '#EAF6EF', color: '#15803D', border: 'rgba(21,128,61,0.22)' },
-  A_plus: { bg: '#EAF6EF', color: '#15803D', border: 'rgba(21,128,61,0.22)' },
-  A: { bg: '#EAF6EF', color: '#15803D', border: 'rgba(21,128,61,0.22)' },
-  B: { bg: '#FEF3C7', color: '#B45309', border: 'rgba(180,83,9,0.22)' },
-  C: { bg: '#FDECEC', color: '#B91C1C', border: 'rgba(185,28,28,0.22)' },
-  PIP: { bg: '#FDECEC', color: '#B91C1C', border: 'rgba(185,28,28,0.22)' },
-};
-
 export default function TierChip({ tier, size = 'small' }: Props) {
-  const styles = TIER_STYLES[tier];
+  const theme = useTheme();
+  const styles = toneStyle(TIER_TONE[tier], theme);
   return (
     <Chip
       label={formatTierLabel(tier)}

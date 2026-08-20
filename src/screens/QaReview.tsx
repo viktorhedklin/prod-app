@@ -34,11 +34,12 @@ import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
 import TierChip from '../components/TierChip';
 import PageHeader from '../components/PageHeader';
-import type { Tier } from '../types';
+import EmptyState from '../components/EmptyState';
+import type { Thresholds, Tier } from '../types';
 import { extractQaFromScreenshots } from '../ai';
 import { startOfWeekLocal } from '../dateUtils';
-
-const QA_TARGET = 93;
+import { DEFAULT_KPI_TARGETS } from '../defaults';
+import { tierFromValue } from '../grading';
 
 const CATEGORY_OPTIONS = [
   'Accuracy',
@@ -62,13 +63,8 @@ function getWeekLabel(weekStart: string): string {
   return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 }
 
-function qaGrade(pct: number): Tier {
-  if (pct >= 95) return 'S';
-  if (pct >= 93) return 'A_plus';
-  if (pct >= 90) return 'A';
-  if (pct >= 85) return 'B';
-  if (pct >= 80) return 'C';
-  return 'PIP';
+function qaGrade(pct: number, thresholds: Thresholds): Tier {
+  return tierFromValue(pct, thresholds, 'higher_is_better') ?? 'PIP';
 }
 
 function computeQaStreak(sortedEntries: { week_start: string }[]): number {
@@ -89,7 +85,7 @@ function computeQaStreak(sortedEntries: { week_start: string }[]): number {
 }
 
 export default function QaReview() {
-  const { qaEntries, upsertQaEntry, removeQaEntry } = useApp();
+  const { qaEntries, upsertQaEntry, removeQaEntry, targets } = useApp();
   const todayWeek = getWeekStart(new Date());
   const [selectedWeek, setSelectedWeek] = useState(todayWeek);
   const [cases, setCases] = useState('');
@@ -99,6 +95,15 @@ export default function QaReview() {
   const [pendingScreenshots, setPendingScreenshots] = useState<string[]>([]);
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState('');
+
+  const qaThresholds = useMemo(
+    () =>
+      targets.find((t) => t.metric_key === 'qa')?.thresholds
+      ?? DEFAULT_KPI_TARGETS.find((t) => t.metric_key === 'qa')?.thresholds
+      ?? { S: 97, A_plus: 95, A: 92, B: 88, C: 83 },
+    [targets],
+  );
+  const qaTarget = qaThresholds.A_plus;
 
   const sortedEntries = useMemo(
     () => Object.values(qaEntries).sort((a, b) => b.week_start.localeCompare(a.week_start)),
@@ -133,9 +138,9 @@ export default function QaReview() {
         .map((e) => ({
           label: getWeekLabel(e.week_start),
           pct: e.qa_percentage,
-          target: QA_TARGET,
+          target: qaTarget,
         })),
-    [sortedEntries],
+    [sortedEntries, qaTarget],
   );
 
   const categoryFrequency = useMemo(() => {
@@ -242,10 +247,10 @@ export default function QaReview() {
                 <Typography sx={{ fontSize: '2rem', fontWeight: 700, lineHeight: 1 }}>
                   {latestEntry.qa_percentage.toFixed(1)}%
                 </Typography>
-                <TierChip tier={qaGrade(latestEntry.qa_percentage)} />
+                <TierChip tier={qaGrade(latestEntry.qa_percentage, qaThresholds)} />
               </Box>
             ) : (
-              <Typography variant="body2" color="text.secondary">No data yet</Typography>
+              <EmptyState title="No data yet" />
             )}
             {latestEntry && (
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
@@ -267,7 +272,7 @@ export default function QaReview() {
         <Grid size={{ xs: 12, sm: 3 }}>
           <StatCard title="Target">
             <Typography sx={{ fontSize: '2rem', fontWeight: 700, lineHeight: 1, color: 'primary.main' }}>
-              {QA_TARGET}%
+              {qaTarget}%
             </Typography>
             {latestEntry && (
               <Typography
@@ -275,13 +280,13 @@ export default function QaReview() {
                 sx={{
                   display: 'block',
                   mt: 0.5,
-                  color: latestEntry.qa_percentage >= QA_TARGET ? 'success.main' : 'error.main',
+                  color: latestEntry.qa_percentage >= qaTarget ? 'success.main' : 'error.main',
                   fontWeight: 600,
                 }}
               >
-                {latestEntry.qa_percentage >= QA_TARGET
-                  ? `${(latestEntry.qa_percentage - QA_TARGET).toFixed(1)}% above target`
-                  : `${(QA_TARGET - latestEntry.qa_percentage).toFixed(1)}% below target`}
+                {latestEntry.qa_percentage >= qaTarget
+                  ? `${(latestEntry.qa_percentage - qaTarget).toFixed(1)}% above target`
+                  : `${(qaTarget - latestEntry.qa_percentage).toFixed(1)}% below target`}
               </Typography>
             )}
           </StatCard>
@@ -560,8 +565,8 @@ export default function QaReview() {
             </TableHead>
             <TableBody>
               {sortedEntries.map((e) => {
-                const grade = qaGrade(e.qa_percentage);
-                const vsTarget = e.qa_percentage - QA_TARGET;
+                const grade = qaGrade(e.qa_percentage, qaThresholds);
+                const vsTarget = e.qa_percentage - qaTarget;
                 return (
                   <TableRow
                     key={e.week_start}

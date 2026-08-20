@@ -30,15 +30,18 @@ import TierChip from '../components/TierChip';
 import CoachAvatar from '../components/CoachAvatar';
 import { todayLocal } from '../dateUtils';
 import { loadAiApiKey, saveAiApiKey } from '../storage';
+import EmptyState from '../components/EmptyState';
+import { useTheme } from '@mui/material/styles';
+import { toneStyle } from '../theme';
 import type { JournalCategory, JournalEntry, KPITarget, Thresholds } from '../types';
 
-const CATEGORY_COLORS: Record<JournalCategory, { bg: string; color: string }> = {
-  stress: { bg: '#FDECEC', color: '#B91C1C' },
-  strength: { bg: '#EAF6EF', color: '#15803D' },
-  weakness: { bg: '#FEF3C7', color: '#B45309' },
-  win: { bg: '#E6F4F2', color: '#0F766E' },
-  concern: { bg: '#F3E8F5', color: '#7B3F8E' },
-  general: { bg: '#F0F0F0', color: '#5D6B68' },
+const CATEGORY_TONE: Record<JournalCategory, 'ok' | 'warn' | 'danger' | 'neutral'> = {
+  stress: 'danger',
+  strength: 'ok',
+  weakness: 'warn',
+  win: 'ok',
+  concern: 'neutral',
+  general: 'neutral',
 };
 
 function today(): string {
@@ -469,9 +472,10 @@ export default function Growth() {
         <Grid size={{ xs: 12, md: 5 }}>
           <StatCard title="Achievement Badges">
             {achievements.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">
-                Complete reflections and log data to unlock badges.
-              </Typography>
+              <EmptyState
+                title="No badges yet"
+                hint="Complete reflections and log data to unlock badges."
+              />
             ) : (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {achievements.map((a) => (
@@ -502,9 +506,10 @@ export default function Growth() {
           <Box sx={{ mt: 2 }}>
             <StatCard title="Recent Reflections">
               {reflectionList.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  No reflections yet. Complete your first one from the Reflection tab.
-                </Typography>
+                <EmptyState
+                  title="No reflections yet"
+                  hint="Complete your first one from the Reflection tab."
+                />
               ) : (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   {reflectionList.slice(0, 5).map((r) => (
@@ -548,8 +553,9 @@ export default function Growth() {
 }
 
 function JournalBubble({ entry }: { entry: JournalEntry }) {
+  const theme = useTheme();
   const cat = entry.category;
-  const catStyle = cat ? CATEGORY_COLORS[cat] : null;
+  const catStyle = cat ? toneStyle(CATEGORY_TONE[cat], theme) : null;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>

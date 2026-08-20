@@ -17,6 +17,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
 import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 import type { TaskItem } from '../types';
 import { todayLocal } from '../dateUtils';
 
@@ -369,26 +370,15 @@ export default function Tasks() {
             </Box>
             <Divider sx={{ mb: 1 }} />
             {filtered.length === 0 ? (
-              <Box
-  sx={{
-    py: 4,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 1,
-    textAlign: 'center',
-  }}
->
-  <CheckCircleIcon sx={{ fontSize: 40, color: 'success.light' }} />
-  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
-    {filter === 'all' ? 'No tasks yet.' : `No ${filter} tasks.`}
-  </Typography>
-  <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 320 }}>
-    {filter === 'all'
-      ? 'Add your shift work above to start tracking task hours.'
-      : 'Try a different filter, or add new tasks above.'}
-  </Typography>
-</Box>
+              <EmptyState
+                icon={<CheckCircleIcon sx={{ fontSize: 40 }} />}
+                title={filter === 'all' ? 'No tasks yet.' : `No ${filter} tasks.`}
+                hint={
+                  filter === 'all'
+                    ? 'Add your shift work above to start tracking task hours.'
+                    : 'Try a different filter, or add new tasks above.'
+                }
+              />
             ) : (
               filtered.map((task) => (
                 <TaskRow
