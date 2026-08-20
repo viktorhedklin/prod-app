@@ -24,6 +24,7 @@ import { computeWeightedGrade, tierFromValue, aggregateEntries, formatTierLabel,
 import StatCard from '../components/StatCard';
 import TierChip from '../components/TierChip';
 import DateNav from '../components/DateNav';
+import PageHeader from '../components/PageHeader';
 import type { DailyEntry, WeeklyEntry } from '../types';
 import { todayLocal, dateFromKey, addDays, startOfWeekLocal } from '../dateUtils';
 
@@ -462,23 +463,26 @@ export default function Today() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-        <ToggleButtonGroup
-          value={mode}
-          exclusive
-          onChange={(_, v) => { if (v) setMode(v); }}
-          size="small"
-          sx={{ bgcolor: 'background.paper', '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 600, px: 2 } }}
-        >
-          <ToggleButton value="daily">Daily</ToggleButton>
-          <ToggleButton value="weekly">Weekly</ToggleButton>
-        </ToggleButtonGroup>
-        <Typography variant="caption" color="text.secondary">
-          {mode === 'daily'
-            ? "Log each day's metrics, or switch to Weekly to add whole-week totals (great for backfilling)."
-            : 'Add totals for a whole week at once — past weeks too. These fill the daily trend so you have a complete picture.'}
-        </Typography>
-      </Box>
+      <PageHeader
+        title={mode === 'daily' ? 'Today' : 'Weekly Entry'}
+        subtitle={
+          mode === 'daily'
+            ? 'Log each day\'s metrics — use the steppers or tap the numbers to type.'
+            : 'Add totals for a whole week at once — past weeks too. These fill the daily trend.'
+        }
+        action={
+          <ToggleButtonGroup
+            value={mode}
+            exclusive
+            onChange={(_, v) => { if (v) setMode(v); }}
+            size="small"
+            sx={{ bgcolor: 'background.paper', '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 600, px: 2 } }}
+          >
+            <ToggleButton value="daily">Daily</ToggleButton>
+            <ToggleButton value="weekly">Weekly</ToggleButton>
+          </ToggleButtonGroup>
+        }
+      />
 
       {mode === 'weekly' ? (
         <Box>
@@ -500,7 +504,7 @@ export default function Today() {
           {weeklyTier && (
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
               <Typography variant="body2" color="text.secondary">
-                Week score: <strong style={{ color: '#2952A3' }}>{formatTierLabel(weeklyTier)}</strong>
+                Week score: <strong>{formatTierLabel(weeklyTier)}</strong>
               </Typography>
             </Box>
           )}
@@ -576,7 +580,7 @@ export default function Today() {
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
           <Typography variant="body2" color="text.secondary">
             {date === todayLocal() ? "Today's" : 'Day'} score:{' '}
-            <strong style={{ color: '#2952A3' }}>{score.toFixed(2)}</strong>
+            <strong>{score.toFixed(2)}</strong>
           </Typography>
         </Box>
       )}
@@ -589,8 +593,8 @@ export default function Today() {
           alignItems: 'center',
           gap: 2,
           borderRadius: 3,
-          bgcolor: 'primary.main',
-          color: 'primary.contrastText',
+          background: 'linear-gradient(135deg, #0F766E 0%, #0D9488 55%, #14B8A6 100%)',
+          color: '#FFFFFF',
           overflow: 'hidden',
           position: 'relative',
           animation: 'fadeInUp 0.4s ease both',

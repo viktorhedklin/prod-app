@@ -15,6 +15,7 @@ import { useApp } from '../AppContext';
 import { computeWeightedGrade, formatTierLabel, computeRollingAverage, computeTaskHoursBacklog, getOpenShiftItems } from '../grading';
 import { generateReflectionQuestions, generateReflectionTips } from '../ai';
 import StatCard from '../components/StatCard';
+import PageHeader from '../components/PageHeader';
 import TierChip from '../components/TierChip';
 import MoodSelector, { moodEmoji, moodLabel } from '../components/MoodSelector';
 import type { AiTip, MoodType } from '../types';
@@ -149,14 +150,15 @@ export default function Reflection() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          End-of-Day Reflection
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {formatDate(date)}
-        </Typography>
-      </Box>
+      <PageHeader
+        title="End-of-Day Reflection"
+        subtitle="Understand your day and get personalized coaching."
+        action={
+          <Typography variant="body2" color="text.secondary">
+            {formatDate(date)}
+          </Typography>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError(null)}>

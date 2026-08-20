@@ -21,6 +21,7 @@ import WavingHandIcon from '@mui/icons-material/WavingHand';
 import EditIcon from '@mui/icons-material/Edit';
 import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
+import PageHeader from '../components/PageHeader';
 import {
   generateCoachingPlan,
   generateCoachingFollowUp,
@@ -237,28 +238,29 @@ export default function Coaching() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Coaching
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          {hasProfile && (
-            <Button size="small" variant="outlined" onClick={startOnboarding} startIcon={<EditIcon />} sx={{ fontWeight: 600 }}>
-              My Profile
+      <PageHeader
+        title="Coaching"
+        subtitle="Personalized plans and follow-ups built from your real data."
+        action={
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {hasProfile && (
+              <Button size="small" variant="outlined" onClick={startOnboarding} startIcon={<EditIcon />} sx={{ fontWeight: 600 }}>
+                My Profile
+              </Button>
+            )}
+            <Button
+              variant="contained"
+              size="small"
+              onClick={handleGenerate}
+              disabled={creating}
+              startIcon={creating ? <CircularProgress size={16} /> : <AddIcon />}
+              sx={{ fontWeight: 600 }}
+            >
+              {creating ? 'Analyzing...' : 'New Coaching Plan'}
             </Button>
-          )}
-          <Button
-            variant="contained"
-            size="small"
-            onClick={handleGenerate}
-            disabled={creating}
-            startIcon={creating ? <CircularProgress size={16} /> : <AddIcon />}
-            sx={{ fontWeight: 600 }}
-          >
-            {creating ? 'Analyzing...' : 'New Coaching Plan'}
-          </Button>
-        </Box>
-      </Box>
+          </Box>
+        }
+      />
 
       {error && (
         <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError(null)}>

@@ -1,11 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Fade from '@mui/material/Fade';
-import theme from './theme';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import TodayIcon from '@mui/icons-material/Today';
+import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import ReportIcon from '@mui/icons-material/Report';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import VerifiedIcon from '@mui/icons-material/Verified';
+import SchoolIcon from '@mui/icons-material/School';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import { lightTheme, darkTheme } from './theme';
 import { AppProvider } from './AppContext';
 import Dashboard from './screens/Dashboard';
 import Today from './screens/Today';
@@ -18,15 +31,15 @@ import Coaching from './screens/Coaching';
 
 type Tab = 'dashboard' | 'today' | 'tasks' | 'escalations' | 'reflection' | 'growth' | 'qa' | 'coaching';
 
-const TABS: Array<{ id: Tab; label: string }> = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'today', label: 'Today' },
-  { id: 'tasks', label: 'Tasks' },
-  { id: 'escalations', label: 'Escalations' },
-  { id: 'reflection', label: 'Reflect' },
-  { id: 'qa', label: 'QA Review' },
-  { id: 'coaching', label: 'Coaching' },
-  { id: 'growth', label: 'My Growth' },
+const TABS: Array<{ id: Tab; label: string; icon: typeof DashboardIcon }> = [
+  { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon },
+  { id: 'today', label: 'Today', icon: TodayIcon },
+  { id: 'tasks', label: 'Tasks', icon: TaskAltIcon },
+  { id: 'escalations', label: 'Escalations', icon: ReportIcon },
+  { id: 'reflection', label: 'Reflect', icon: PsychologyIcon },
+  { id: 'qa', label: 'QA Review', icon: VerifiedIcon },
+  { id: 'coaching', label: 'Coaching', icon: SchoolIcon },
+  { id: 'growth', label: 'My Growth', icon: TrendingUpIcon },
 ];
 
 function Nav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
@@ -37,31 +50,49 @@ function Nav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) 
         bgcolor: 'background.paper',
         borderBottom: '1px solid',
         borderColor: 'divider',
-        px: { xs: 2, md: 3 },
-        py: 1.25,
+        px: { xs: 1.5, md: 3 },
+        py: 1,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 2,
         position: 'sticky',
         top: 0,
         zIndex: 1100,
       }}
     >
-      <Typography
-        sx={{
-          flexShrink: 0,
-          fontWeight: 700,
-          fontSize: '0.9375rem',
-          color: 'text.primary',
-          letterSpacing: '-0.01em',
-        }}
-      >
-        Productivity Grader
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+        <Box
+          sx={{
+            width: 30,
+            height: 30,
+            borderRadius: 2,
+            background: 'linear-gradient(135deg, #0F766E 0%, #14B8A6 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            boxShadow: '0 3px 8px rgba(13,148,136,0.3)',
+          }}
+        >
+          <TrendingUpIcon sx={{ fontSize: 18 }} />
+        </Box>
+        <Typography
+          sx={{
+            fontWeight: 800,
+            fontSize: { xs: '0.875rem', md: '1rem' },
+            color: 'text.primary',
+            letterSpacing: '-0.02em',
+            fontFamily: '"Plus Jakarta Sans Variable", "Roboto", sans-serif',
+          }}
+        >
+          Productivity Grader
+        </Typography>
+      </Box>
       <Box
         sx={{
           display: 'flex',
-          bgcolor: '#F3F3F3',
+          bgcolor: 'background.default',
           borderRadius: 2,
           p: 0.375,
           gap: 0.25,
@@ -72,50 +103,130 @@ function Nav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) 
           '&::-webkit-scrollbar': { display: 'none' },
         }}
       >
-        {TABS.map((tab) => (
-          <Button
-            key={tab.id}
-            onClick={() => onChange(tab.id)}
-            size="small"
-            disableRipple
-            sx={{
-              px: { xs: 1.25, md: 2 },
-              py: 0.5,
-              minWidth: 0,
-              flexShrink: 0,
-              whiteSpace: 'nowrap',
-              fontSize: { xs: '0.75rem', md: '0.8125rem' },
-              fontWeight: active === tab.id ? 600 : 400,
-              bgcolor: active === tab.id ? 'background.paper' : 'transparent',
-              color: active === tab.id ? 'primary.main' : 'text.secondary',
-              border: active === tab.id ? '1px solid' : '1px solid transparent',
-              borderColor: active === tab.id ? 'divider' : 'transparent',
-              borderRadius: 1.5,
-              boxShadow: active === tab.id ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 150ms ease',
-              '&:hover': {
-                bgcolor: active === tab.id ? 'background.paper' : 'rgba(0,0,0,0.04)',
-                boxShadow: active === tab.id ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-              },
-            }}
-          >
-            {tab.label}
-          </Button>
-        ))}
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <Button
+              key={tab.id}
+              onClick={() => onChange(tab.id)}
+              size="small"
+              disableRipple
+              startIcon={<Icon sx={{ fontSize: 17 }} />}
+              sx={{
+                px: { xs: 1, md: 1.5 },
+                py: 0.6,
+                minWidth: 0,
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+                fontSize: { xs: '0.75rem', md: '0.8125rem' },
+                fontWeight: active === tab.id ? 700 : 500,
+                bgcolor: active === tab.id ? 'background.paper' : 'transparent',
+                color: active === tab.id ? 'primary.main' : 'text.secondary',
+                border: active === tab.id ? '1px solid' : '1px solid transparent',
+                borderColor: active === tab.id ? 'divider' : 'transparent',
+                borderRadius: 1.5,
+                boxShadow: active === tab.id ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 150ms ease',
+                '&:hover': {
+                  bgcolor: active === tab.id ? 'background.paper' : 'rgba(0,0,0,0.04)',
+                  color: active === tab.id ? 'primary.main' : 'text.primary',
+                },
+              }}
+            >
+              {tab.label}
+            </Button>
+          );
+        })}
       </Box>
+    </Box>
+  );
+}
+
+function MobileNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
+  const firstSix = TABS.slice(0, 6);
+  return (
+    <Box
+      component="nav"
+      sx={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1200,
+        bgcolor: 'background.paper',
+        borderTop: '1px solid',
+        borderColor: 'divider',
+        px: 1,
+        pt: 0.5,
+        pb: 'calc(0.5rem + env(safe-area-inset-bottom))',
+        display: 'flex',
+        justifyContent: 'space-between',
+      }}
+    >
+      {firstSix.map((tab) => {
+        const Icon = tab.icon;
+        const isActive = active === tab.id;
+        return (
+          <Tooltip key={tab.id} title={tab.label} placement="top">
+            <IconButton
+              onClick={() => onChange(tab.id)}
+              aria-label={tab.label}
+              sx={{
+                flex: 1,
+                minWidth: 48,
+                py: 0.5,
+                borderRadius: 2,
+                color: isActive ? 'primary.main' : 'text.secondary',
+                '&:hover': { bgcolor: 'background.default' },
+              }}
+            >
+              <Icon sx={{ fontSize: 24, transition: 'transform 150ms ease' }} />
+            </IconButton>
+          </Tooltip>
+        );
+      })}
     </Box>
   );
 }
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const saved = localStorage.getItem('theme-mode');
+    if (saved) return saved === 'dark';
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('theme-mode', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
+
+  const theme = darkMode ? darkTheme : lightTheme;
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: isMobile ? 8 : 0 }}>
         <Nav active={activeTab} onChange={setActiveTab} />
-        <Box sx={{ py: { xs: 1, md: 1.5 } }}>
+        <Box sx={{ position: 'fixed', top: 64, right: 16, zIndex: 1300 }}>
+          <IconButton
+            onClick={() => setDarkMode((m) => !m)}
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            sx={{
+              bgcolor: 'background.paper',
+              border: '1px solid',
+              borderColor: 'divider',
+              color: darkMode ? 'warning.main' : 'text.secondary',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
+              '&:hover': { bgcolor: 'background.default' },
+            }}
+          >
+            {darkMode ? <LightModeIcon sx={{ fontSize: 20 }} /> : <DarkModeIcon sx={{ fontSize: 20 }} />}
+          </IconButton>
+        </Box>
+        <Box sx={{ py: { xs: 2, md: 2.5 }, px: { xs: 1.5, md: 0 } }}>
           <Fade in key={activeTab} timeout={250}>
             <Box>
               {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
@@ -129,6 +240,7 @@ function App() {
             </Box>
           </Fade>
         </Box>
+        {isMobile && <MobileNav active={activeTab} onChange={setActiveTab} />}
       </Box>
     </ThemeProvider>
   );

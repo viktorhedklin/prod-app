@@ -33,6 +33,7 @@ import {
 import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
 import TierChip from '../components/TierChip';
+import PageHeader from '../components/PageHeader';
 import type { Tier } from '../types';
 import { extractQaFromScreenshots } from '../ai';
 
@@ -230,9 +231,10 @@ export default function QaReview() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-        Weekly QA Review
-      </Typography>
+      <PageHeader
+        title="Weekly QA Review"
+        subtitle="Log your QA scores — type them in or upload a screenshot and the app reads it for you."
+      />
 
       {/* Summary cards */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
@@ -346,8 +348,8 @@ export default function QaReview() {
                     }}
                     formatter={(v: unknown) => [typeof v === 'number' ? `${v.toFixed(1)}%` : '—', 'QA']}
                   />
-                  <Line type="monotone" dataKey="pct" stroke="#2952A3" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls={false} />
-                  <Line type="monotone" dataKey="target" stroke="#4C8C6B" strokeWidth={1.5} strokeDasharray="5 4" dot={false} activeDot={false} />
+                  <Line type="monotone" dataKey="pct" stroke="#0D9488" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls={false} />
+                  <Line type="monotone" dataKey="target" stroke="#15803D" strokeWidth={1.5} strokeDasharray="5 4" dot={false} activeDot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </Box>

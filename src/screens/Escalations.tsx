@@ -11,6 +11,7 @@ import Divider from '@mui/material/Divider';
 import InboxIcon from '@mui/icons-material/Inbox';
 import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
+import PageHeader from '../components/PageHeader';
 import type { EscalationItem } from '../types';
 
 function today(): string {
@@ -21,8 +22,8 @@ type FilterStatus = 'all' | 'open' | 'escalated' | 'resolved';
 
 const STATUS_STYLES: Record<string, { bg: string; color: string }> = {
   open: { bg: '#FEF3C7', color: '#B45309' },
-  escalated: { bg: '#EAF5EF', color: '#4C8C6B' },
-  resolved: { bg: '#F5F5F5', color: '#6B6B6B' },
+  escalated: { bg: '#EAF6EF', color: '#15803D' },
+  resolved: { bg: '#F0F0F0', color: '#5D6B68' },
 };
 
 function EscalationRow({
@@ -40,7 +41,8 @@ function EscalationRow({
     <Box
       sx={{
         py: 1.5,
-        borderBottom: '1px solid #F0F0F0',
+        borderBottom: '1px solid',
+        borderColor: 'divider',
         '&:last-child': { borderBottom: 'none' },
         opacity: esc.status === 'resolved' ? 0.6 : 1,
         transition: 'opacity 150ms ease',
@@ -58,7 +60,7 @@ function EscalationRow({
               <Chip
                 label="Overdue"
                 size="small"
-                sx={{ bgcolor: '#FBEAE8', color: '#C4554D', fontWeight: 600, height: 18, fontSize: '0.65rem' }}
+                sx={{ bgcolor: '#FDECEC', color: '#B91C1C', fontWeight: 600, height: 18, fontSize: '0.65rem' }}
               />
             )}
           </Box>
@@ -159,6 +161,10 @@ export default function Escalations() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
+      <PageHeader
+        title="Escalations"
+        subtitle="Log and track escalations, then make sure accuracy is on point."
+      />
       {/* New Escalation Form */}
       <StatCard title="New Escalation">
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>

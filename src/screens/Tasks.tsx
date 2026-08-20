@@ -16,6 +16,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
+import PageHeader from '../components/PageHeader';
 import type { TaskItem } from '../types';
 import { todayLocal } from '../dateUtils';
 
@@ -184,6 +185,10 @@ export default function Tasks() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
+      <PageHeader
+        title="Tasks"
+        subtitle="Track what you need to submit before your shift ends."
+      />
       {/* Shift progress / logout gate */}
       <StatCard title="Shift progress">
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
@@ -200,7 +205,7 @@ export default function Tasks() {
           sx={{
             height: 8,
             borderRadius: 4,
-            bgcolor: '#F0F0F0',
+            bgcolor: 'action.hover',
             '& .MuiLinearProgress-bar': {
               bgcolor: allDone ? 'success.main' : 'warning.main',
               borderRadius: 4,

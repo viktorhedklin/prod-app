@@ -26,17 +26,18 @@ import { computeRollingAverage } from '../grading';
 import { generateJournalResponse, generateWeeklyRecap } from '../ai';
 import { computeReflectionStreak } from '../insights';
 import StatCard from '../components/StatCard';
+import PageHeader from '../components/PageHeader';
 import TierChip from '../components/TierChip';
 import { loadAiApiKey, saveAiApiKey } from '../storage';
 import type { JournalCategory, JournalEntry, KPITarget, Thresholds } from '../types';
 
 const CATEGORY_COLORS: Record<JournalCategory, { bg: string; color: string }> = {
-  stress: { bg: '#FBEAE8', color: '#C4554D' },
-  strength: { bg: '#EAF5EF', color: '#4C8C6B' },
+  stress: { bg: '#FDECEC', color: '#B91C1C' },
+  strength: { bg: '#EAF6EF', color: '#15803D' },
   weakness: { bg: '#FEF3C7', color: '#B45309' },
-  win: { bg: '#E8F0FE', color: '#2952A3' },
+  win: { bg: '#E6F4F2', color: '#0F766E' },
   concern: { bg: '#F3E8F5', color: '#7B3F8E' },
-  general: { bg: '#F3F3F3', color: '#6B6B6B' },
+  general: { bg: '#F0F0F0', color: '#5D6B68' },
 };
 
 function today(): string {
@@ -170,14 +171,20 @@ export default function Growth() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          My Growth Profile
-        </Typography>
-        <IconButton onClick={() => setShowSettings(!showSettings)} size="small">
-          <SettingsIcon fontSize="small" />
-        </IconButton>
-      </Box>
+      <PageHeader
+        title="My Growth Profile"
+        subtitle="Your targets, achievements, and insights at a glance."
+        action={
+          <IconButton
+            onClick={() => setShowSettings(!showSettings)}
+            size="small"
+            aria-label="Settings"
+            sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}
+          >
+            <SettingsIcon fontSize="small" />
+          </IconButton>
+        }
+      />
 
       {/* KPI Targets editor */}
       <Box sx={{ mb: 2 }}>

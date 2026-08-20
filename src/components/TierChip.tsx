@@ -8,12 +8,12 @@ interface Props {
 }
 
 const TIER_STYLES: Record<Tier, { bg: string; color: string; border: string }> = {
-  S: { bg: '#EAF5EF', color: '#4C8C6B', border: 'rgba(76,140,107,0.2)' },
-  A_plus: { bg: '#EAF5EF', color: '#4C8C6B', border: 'rgba(76,140,107,0.2)' },
-  A: { bg: '#EAF5EF', color: '#4C8C6B', border: 'rgba(76,140,107,0.2)' },
-  B: { bg: '#FEF3C7', color: '#B45309', border: 'rgba(180,83,9,0.2)' },
-  C: { bg: '#FBEAE8', color: '#C4554D', border: 'rgba(196,85,77,0.2)' },
-  PIP: { bg: '#FBEAE8', color: '#C4554D', border: 'rgba(196,85,77,0.2)' },
+  S: { bg: '#EAF6EF', color: '#15803D', border: 'rgba(21,128,61,0.22)' },
+  A_plus: { bg: '#EAF6EF', color: '#15803D', border: 'rgba(21,128,61,0.22)' },
+  A: { bg: '#EAF6EF', color: '#15803D', border: 'rgba(21,128,61,0.22)' },
+  B: { bg: '#FEF3C7', color: '#B45309', border: 'rgba(180,83,9,0.22)' },
+  C: { bg: '#FDECEC', color: '#B91C1C', border: 'rgba(185,28,28,0.22)' },
+  PIP: { bg: '#FDECEC', color: '#B91C1C', border: 'rgba(185,28,28,0.22)' },
 };
 
 export default function TierChip({ tier, size = 'small' }: Props) {

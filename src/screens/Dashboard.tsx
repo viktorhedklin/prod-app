@@ -3,7 +3,6 @@ import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Button from '@mui/material/Button';
 import ButtonGroup from '@mui/material/ButtonGroup';
 import Fade from '@mui/material/Fade';
@@ -77,26 +76,33 @@ function getPeriodEntries(
 }
 
 const GRADE_STYLES: Record<Tier, { bg: string; color: string }> = {
-  S: { bg: '#EAF5EF', color: '#4C8C6B' },
-  A_plus: { bg: '#EAF5EF', color: '#4C8C6B' },
-  A: { bg: '#EAF5EF', color: '#4C8C6B' },
+  S: { bg: '#EAF6EF', color: '#15803D' },
+  A_plus: { bg: '#EAF6EF', color: '#15803D' },
+  A: { bg: '#EAF6EF', color: '#15803D' },
   B: { bg: '#FEF3C7', color: '#B45309' },
-  C: { bg: '#FBEAE8', color: '#C4554D' },
-  PIP: { bg: '#FBEAE8', color: '#C4554D' },
+  C: { bg: '#FDECEC', color: '#B91C1C' },
+  PIP: { bg: '#FDECEC', color: '#B91C1C' },
 };
 
-function ScoreRing({ score, grade, size = 72 }: { score: number | null; grade: Tier | null; size?: number }) {
+function ScoreRing({ score, grade, size = 72, light = false }: { score: number | null; grade: Tier | null; size?: number; light?: boolean }) {
   const pct = score !== null ? Math.min((score / 5) * 100, 100) : 0;
-  const styles = grade ? GRADE_STYLES[grade] : { bg: '#F5F5F5', color: '#6B6B6B' };
+  const displayPct = useCountUp(pct, 800);
+  const styles = grade ? GRADE_STYLES[grade] : { bg: '#F5F5F5', color: light ? 'rgba(255,255,255,0.85)' : '#6B6B6B' };
   return (
     <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       <CircularProgress
         variant="determinate"
-        value={pct}
+        value={displayPct}
         size={size}
         thickness={5}
         sx={{
-          color: styles.color,
+          color: light ? '#FFFFFF' : styles.color,
+          '& .MuiCircularProgress-circle': {
+            strokeLinecap: 'round',
+          },
+          '& .MuiCircularProgress-root': {
+            color: light ? 'rgba(255,255,255,0.2)' : undefined,
+          },
           transition: 'all 0.6s cubic-bezier(0.4,0,0.2,1)',
           animation: 'fadeInUp 0.5s ease both',
         }}
@@ -110,11 +116,11 @@ function ScoreRing({ score, grade, size = 72 }: { score: number | null; grade: T
           justifyContent: 'center',
         }}
       >
-        <Typography sx={{ fontSize: size > 60 ? '1.5rem' : '1.1rem', fontWeight: 700, color: styles.color, lineHeight: 1 }}>
+        <Typography sx={{ fontSize: size > 60 ? '1.5rem' : '1.1rem', fontWeight: 800, color: light ? '#FFFFFF' : styles.color, lineHeight: 1, fontFamily: '"Plus Jakarta Sans Variable", "Roboto", sans-serif' }}>
           {grade ? formatTierLabel(grade) : '—'}
         </Typography>
         {score !== null && (
-          <Typography sx={{ fontSize: size > 60 ? '0.75rem' : '0.65rem', color: 'text.secondary', fontWeight: 500, mt: 0.25 }}>
+          <Typography sx={{ fontSize: size > 60 ? '0.75rem' : '0.65rem', color: light ? 'rgba(255,255,255,0.8)' : 'text.secondary', fontWeight: 500, mt: 0.25 }}>
             {score.toFixed(2)}
           </Typography>
         )}
@@ -145,12 +151,12 @@ function ShiftItemRow({
         py: 1,
         px: 1.5,
         borderRadius: 1.5,
-        bgcolor: overdue ? '#FBEAE8' : '#F7F7F7',
+        bgcolor: overdue ? 'error.light' : 'action.hover',
         mb: 0.75,
         gap: 2,
         transition: 'background-color 0.2s ease, transform 0.2s ease',
         '&:hover': {
-          bgcolor: overdue ? '#F8D8D5' : '#EFEFEF',
+          bgcolor: overdue ? 'error.light' : 'action.selected',
           transform: 'translateX(2px)',
         },
       }}
@@ -158,6 +164,26 @@ function ShiftItemRow({
       {children}
     </Box>
   );
+}
+
+// Animated count-up for the hero score
+function useCountUp(target: number, duration = 700) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const start = performance.now();
+    const from = display;
+    const tick = (now: number) => {
+      const t = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(from + (target - from) * eased);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target]);
+  return display;
 }
 
 function MetricBar({ label, value, tier, weight, metricKey }: {
@@ -188,7 +214,7 @@ function MetricBar({ label, value, tier, weight, metricKey }: {
             flex: 1,
             height: 6,
             borderRadius: 3,
-            bgcolor: '#F0F0F0',
+            bgcolor: 'action.hover',
             '& .MuiLinearProgress-bar': {
               bgcolor: tierStyles.color,
               borderRadius: 3,
@@ -256,13 +282,6 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
     [entries, targets, latestQa],
   );
 
-  const allEntries = Object.values(entries);
-  const overallScore = useMemo(() => {
-    if (allEntries.length === 0) return null;
-    const { score } = computeWeightedGrade(allEntries, targets, latestQa);
-    return score;
-  }, [allEntries, targets, latestQa]);
-
   const backlog = useMemo(
     () => computeTaskHoursBacklog(Object.values(entries)),
     [entries],
@@ -300,9 +319,37 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
+      {/* Page header */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+        <Box>
+          <Typography
+            sx={{
+              fontSize: { xs: '1.35rem', md: '1.6rem' },
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
+              fontFamily: '"Plus Jakarta Sans Variable", "Roboto", sans-serif',
+            }}
+          >
+            Dashboard
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+            Your performance at a glance — check in, spot trends, and close out your shift.
+          </Typography>
+        </Box>
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+        </Typography>
+      </Box>
+
       {/* Grade + Period toggle */}
-      <Card elevation={0} sx={{ mb: 2, animation: 'fadeInUp 0.4s ease both' }}>
-        <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+      <Card elevation={0} sx={{ mb: 2, overflow: 'hidden', border: 'none', animation: 'fadeInUp 0.4s ease both' }}>
+        <Box
+          sx={{
+            background: 'linear-gradient(135deg, #0F766E 0%, #0D9488 55%, #14B8A6 100%)',
+            px: { xs: 2.5, md: 3 },
+            py: 2.5,
+          }}
+        >
           <Box
             sx={{
               display: 'flex',
@@ -313,14 +360,14 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <ScoreRing score={score} grade={grade} size={72} />
+              <ScoreRing score={score} grade={grade} size={72} light />
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.75)' }}>
                   Current Score
                 </Typography>
-                <Typography sx={{ fontSize: '1.75rem', fontWeight: 700, color: 'text.primary', lineHeight: 1.1 }}>
+                <Typography sx={{ fontSize: '1.75rem', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.1, fontFamily: '"Plus Jakarta Sans Variable", "Roboto", sans-serif' }}>
                   {score !== null ? score.toFixed(2) : '—'}
-                  <Typography component="span" variant="body2" color="text.secondary" sx={{ fontWeight: 400, ml: 0.5 }}>/ 5.00</Typography>
+                  <Typography component="span" variant="body2" sx={{ fontWeight: 400, ml: 0.5, color: 'rgba(255,255,255,0.7)' }}>/ 5.00</Typography>
                 </Typography>
               </Box>
             </Box>
@@ -331,12 +378,12 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
                   onClick={() => setPeriod(p)}
                   sx={{
                     px: 2,
-                    fontWeight: period === p ? 600 : 400,
-                    bgcolor: period === p ? 'primary.main' : 'transparent',
-                    color: period === p ? 'primary.contrastText' : 'text.secondary',
-                    borderColor: '#E4E4E4',
+                    fontWeight: period === p ? 700 : 500,
+                    bgcolor: period === p ? '#FFFFFF' : 'rgba(255,255,255,0.12)',
+                    color: period === p ? 'primary.main' : '#FFFFFF',
+                    borderColor: 'rgba(255,255,255,0.35)',
                     '&:hover': {
-                      bgcolor: period === p ? 'primary.dark' : 'action.hover',
+                      bgcolor: period === p ? '#FFFFFF' : 'rgba(255,255,255,0.2)',
                     },
                   }}
                 >
@@ -345,10 +392,10 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
               ))}
             </ButtonGroup>
           </Box>
-        </CardContent>
+        </Box>
       </Card>
 
-      {/* Score Summary: Today / Week / Month / Overall */}
+      {/* Score Summary: Today / Week / Month */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
         {(['today', 'week', 'month'] as PeriodType[]).map((p, i) => {
           const pEntries = getPeriodEntries(entries, p);
@@ -357,8 +404,8 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
             : null;
           const { score: s, grade: g } = weekCard ?? computeWeightedGrade(pEntries, targets, latestQa);
           return (
-            <Grid size={{ xs: 12, sm: 3 }} key={p}>
-              <StatCard title={PERIOD_LABELS[p]} interactive delay={i * 50}>
+            <Grid size={{ xs: 12, sm: 4 }} key={p}>
+              <StatCard title={PERIOD_LABELS[p]} interactive delay={i * 60}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}>
                   <ScoreRing score={s} grade={g} size={48} />
                 </Box>
@@ -366,23 +413,6 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
             </Grid>
           );
         })}
-        <Grid size={{ xs: 12, sm: 3 }}>
-          <StatCard title="Overall" interactive delay={150}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}>
-              <ScoreRing
-                score={overallScore}
-                grade={
-                  overallScore === null ? null
-                  : overallScore >= 4.5 ? 'S'
-                  : overallScore >= 4 ? 'A_plus'
-                  : overallScore >= 3 ? 'B'
-                  : 'C'
-                }
-                size={48}
-              />
-            </Box>
-          </StatCard>
-        </Grid>
       </Grid>
 
       {/* Daily Focus + Streak + CTA */}
@@ -607,8 +637,8 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
                   <AreaChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
                     <defs>
                       <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#2952A3" stopOpacity={0.2} />
-                        <stop offset="100%" stopColor="#2952A3" stopOpacity={0} />
+                        <stop offset="0%" stopColor="#0D9488" stopOpacity={0.22} />
+                        <stop offset="100%" stopColor="#0D9488" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E4E4E4" />
@@ -637,11 +667,11 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
                     <Area
                       type="monotone"
                       dataKey="score"
-                      stroke="#2952A3"
+                      stroke="#0D9488"
                       strokeWidth={2}
                       fill="url(#scoreGradient)"
-                      dot={{ fill: '#2952A3', r: 3 }}
-                      activeDot={{ r: 5, stroke: '#2952A3', strokeWidth: 2, fill: '#fff' }}
+                      dot={{ fill: '#0D9488', r: 3 }}
+                      activeDot={{ r: 5, stroke: '#0D9488', strokeWidth: 2, fill: '#fff' }}
                       connectNulls={false}
                     />
                   </AreaChart>
@@ -690,7 +720,7 @@ function BacklogStat({
   highlight?: 'red' | 'green';
 }) {
   const color =
-    highlight === 'red' ? '#C4554D' : highlight === 'green' ? '#4C8C6B' : '#1A1A1A';
+    highlight === 'red' ? 'error.main' : highlight === 'green' ? 'success.main' : 'text.primary';
   return (
     <Box>
       <Typography sx={{ fontSize: '1.25rem', fontWeight: 700, color, lineHeight: 1, transition: 'color 0.3s ease' }}>
