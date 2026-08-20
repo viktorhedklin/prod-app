@@ -22,6 +22,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
 import PageHeader from '../components/PageHeader';
+import CoachAvatar from '../components/CoachAvatar';
 import {
   generateCoachingPlan,
   generateCoachingFollowUp,
@@ -262,6 +263,47 @@ export default function Coaching() {
         }
       />
 
+      <Box
+        sx={{
+          mb: 2,
+          p: 2.5,
+          borderRadius: 3,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          flexWrap: 'wrap',
+          background: 'linear-gradient(135deg, rgba(13,148,136,0.10) 0%, rgba(20,184,166,0.06) 100%)',
+          border: '1px solid',
+          borderColor: 'primary.light',
+          animation: 'fadeInUp 0.4s ease both',
+        }}
+      >
+        <CoachAvatar
+          state={creating ? 'thinking' : Object.values(responding).some(Boolean) ? 'speaking' : 'idle'}
+          size={64}
+        />
+        <Box sx={{ flex: 1, minWidth: 220 }}>
+          <Typography
+            variant="subtitle1"
+            sx={{ fontWeight: 700, fontFamily: '"Plus Jakarta Sans Variable", sans-serif' }}
+          >
+            Your AI Coach
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {creating
+              ? 'Analyzing your last 14 days to build your plan…'
+              : Object.values(responding).some(Boolean)
+                ? 'Reading your check-in and replying…'
+                : 'Here to help you grow. Generate a plan or answer a check-in.'}
+          </Typography>
+        </Box>
+        {needsProfile && !editingProfile && (
+          <Button variant="contained" onClick={startOnboarding} sx={{ fontWeight: 600, ml: 'auto' }}>
+            Get to Know Me
+          </Button>
+        )}
+      </Box>
+
       {error && (
         <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError(null)}>
           {error}
@@ -345,7 +387,7 @@ export default function Coaching() {
         <Box sx={{ mb: 2 }}>
           <StatCard title="Your coach wants to know you">
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-              <WavingHandIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+              <CoachAvatar state="idle" size={36} />
               <Box sx={{ flex: 1, minWidth: 220 }}>
                 <Typography variant="body2" color="text.secondary">
                   To coach you properly I need to understand your role, your struggles, what stresses you, what drives you, and how you like to be coached. It only takes a couple of minutes.
@@ -561,15 +603,19 @@ export default function Coaching() {
               {/* Follow-up response */}
               {isDue && plan.status === 'active' && (
                 <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <Box
-                    sx={{
-                      p: 1.5,
-                      borderRadius: 2,
-                      bgcolor: 'primary.main',
-                      color: 'primary.contrastText',
-                    }}
-                  >
-                    <Typography variant="body2">{plan.follow_up_prompt}</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <CoachAvatar state={isLoading ? 'thinking' : 'idle'} size={26} />
+                    <Box
+                      sx={{
+                        p: 1.5,
+                        borderRadius: 2,
+                        bgcolor: 'primary.main',
+                        color: 'primary.contrastText',
+                        maxWidth: '85%',
+                      }}
+                    >
+                      <Typography variant="body2">{plan.follow_up_prompt}</Typography>
+                    </Box>
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <TextField
@@ -621,17 +667,20 @@ export default function Coaching() {
                       <Typography variant="body2" sx={{ mt: 0.25 }}>
                         {c.user_response}
                       </Typography>
-                      <Box
-                        sx={{
-                          mt: 0.75,
-                          p: 1,
-                          borderRadius: 1.5,
-                          bgcolor: 'success.light',
-                        }}
-                      >
-                        <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 500 }}>
-                          {c.coach_response}
-                        </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mt: 0.75 }}>
+                        <CoachAvatar state="idle" size={22} />
+                        <Box
+                          sx={{
+                            p: 1,
+                            borderRadius: 1.5,
+                            bgcolor: 'success.light',
+                            maxWidth: '85%',
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 500 }}>
+                            {c.coach_response}
+                          </Typography>
+                        </Box>
                       </Box>
                     </Box>
                   ))}
