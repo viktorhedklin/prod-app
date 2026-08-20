@@ -3,24 +3,29 @@ import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Fade from '@mui/material/Fade';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
 import CloseIcon from '@mui/icons-material/Close';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useApp } from '../AppContext';
 import { makeEmptyEntry } from '../defaults';
-import { computeWeightedGrade, tierFromValue, aggregateEntries, formatTierLabel } from '../grading';
+import { computeWeightedGrade, tierFromValue, aggregateEntries, formatTierLabel, expandWeeklyEntries } from '../grading';
 import StatCard from '../components/StatCard';
 import TierChip from '../components/TierChip';
 import DateNav from '../components/DateNav';
-import type { DailyEntry } from '../types';
-import { todayLocal } from '../dateUtils';
+import type { DailyEntry, WeeklyEntry } from '../types';
+import { todayLocal, dateFromKey, addDays, startOfWeekLocal } from '../dateUtils';
 
 const STEPPER_FIELDS: Array<{ key: keyof DailyEntry; label: string; min?: number; max?: number; points?: string }> = [
   { key: 'chats_handled', label: 'Chats Handled', min: 0, points: '×1' },
@@ -283,8 +288,10 @@ function productivityPoints(entry: DailyEntry): number {
 }
 
 export default function Today() {
-  const { entries, targets, updateEntry, notify, qaEntries } = useApp();
+  const { entries, targets, updateEntry, notify, qaEntries, weeklyEntries, saveWeeklyEntry, deleteWeeklyEntry } = useApp();
+  const [mode, setMode] = useState<'daily' | 'weekly'>('daily');
   const [date, setDate] = useState(todayLocal());
+  const [weekStart, setWeekStart] = useState(startOfWeekLocal());
   const rawEntry = entries[date] ?? makeEmptyEntry(date);
   const entry = useMemo<DailyEntry>(
     () => ({
@@ -296,11 +303,30 @@ export default function Today() {
   );
 
   const datesWithData = useMemo(() => new Set(Object.keys(entries)), [entries]);
+  const weekly = weeklyEntries[weekStart];
+
+  const weekLabel = useMemo(() => {
+    const end = addDays(weekStart, 6);
+    const s = dateFromKey(weekStart);
+    const e = dateFromKey(end);
+    const fmt = (d: Date) =>
+      d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${fmt(s)} – ${fmt(e)}`;
+  }, [weekStart]);
 
   const latestQa = useMemo(() => {
     const sorted = Object.values(qaEntries).sort((a, b) => b.week_start.localeCompare(a.week_start));
     return sorted[0]?.qa_percentage ?? null;
   }, [qaEntries]);
+
+  const weeklyTier = useMemo(() => {
+    if (!weekly) return null;
+    const merged = expandWeeklyEntries({}, { [weekStart]: weekly });
+    const days = Object.values(merged);
+    if (days.length === 0) return null;
+    const { grade } = computeWeightedGrade(days, targets, latestQa);
+    return grade;
+  }, [weekly, weekStart, targets, latestQa]);
 
   const handleStep = (key: keyof DailyEntry, delta: number, min?: number, max?: number) => {
     const current = entry[key] as number;
@@ -330,6 +356,92 @@ export default function Today() {
     updateEntry(date, { csat_ratings: entry.csat_ratings.filter((_, i) => i !== index) });
   };
 
+  const weeklyFields = useMemo(
+    () => [
+      { key: 'chats_handled' as const, label: 'Chats Handled (week)' },
+      { key: 'emails_handled' as const, label: 'Emails Handled (week)' },
+      { key: 'tasks_handled' as const, label: 'Tasks Handled (week)' },
+      { key: 'internal_notes' as const, label: 'Internal Notes (week)' },
+    ],
+    [],
+  );
+
+  const handleWeeklyStep = (key: keyof WeeklyEntry, delta: number) => {
+    const current = (weekly?.[key] as number) ?? 0;
+    const next = Math.max(0, current + delta);
+    const base: Omit<WeeklyEntry, 'created_at' | 'updated_at'> = weekly
+      ? { ...weekly }
+      : {
+          week_start: weekStart,
+          chats_handled: 0,
+          emails_handled: 0,
+          seek_feedback: 0,
+          tasks_handled: 0,
+          task_hours_logged: 0,
+          task_hours_submitted: 0,
+          internal_notes: 0,
+          csat_ratings: [],
+          escalations_raised: 0,
+          escalation_accuracy_pct: null,
+        };
+    saveWeeklyEntry(weekStart, { ...base, [key]: next });
+  };
+
+  const handleWeeklyPrecise = (raw: string) => {
+    const val = parseFloat(raw);
+    const base: Omit<WeeklyEntry, 'created_at' | 'updated_at'> = weekly
+      ? { ...weekly }
+      : {
+          week_start: weekStart,
+          chats_handled: 0,
+          emails_handled: 0,
+          seek_feedback: 0,
+          tasks_handled: 0,
+          task_hours_logged: 0,
+          task_hours_submitted: 0,
+          internal_notes: 0,
+          csat_ratings: [],
+          escalations_raised: 0,
+          escalation_accuracy_pct: null,
+        };
+    if (!isNaN(val)) {
+      saveWeeklyEntry(weekStart, { ...base, escalation_accuracy_pct: val });
+    }
+  };
+
+  const handleWeeklyCsat = (rating: number) => {
+    const base: Omit<WeeklyEntry, 'created_at' | 'updated_at'> = weekly
+      ? { ...weekly }
+      : {
+          week_start: weekStart,
+          chats_handled: 0,
+          emails_handled: 0,
+          seek_feedback: 0,
+          tasks_handled: 0,
+          task_hours_logged: 0,
+          task_hours_submitted: 0,
+          internal_notes: 0,
+          csat_ratings: [],
+          escalations_raised: 0,
+          escalation_accuracy_pct: null,
+        };
+    saveWeeklyEntry(weekStart, { ...base, csat_ratings: [...(base.csat_ratings ?? []), rating] });
+    notify(`${rating}-star weekly CSAT rating added`);
+  };
+
+  const handleWeeklyCsatRemove = (index: number) => {
+    if (!weekly) return;
+    saveWeeklyEntry(weekStart, {
+      ...weekly,
+      csat_ratings: weekly.csat_ratings.filter((_, i) => i !== index),
+    });
+  };
+
+  const handleDeleteWeek = () => {
+    deleteWeeklyEntry(weekStart);
+    notify('Weekly data deleted for this week', 'info');
+  };
+
   const aggregated = useMemo(() => aggregateEntries([entry], latestQa), [entry, latestQa]);
 
   const liveTiers = useMemo(() => {
@@ -350,6 +462,114 @@ export default function Today() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+        <ToggleButtonGroup
+          value={mode}
+          exclusive
+          onChange={(_, v) => { if (v) setMode(v); }}
+          size="small"
+          sx={{ bgcolor: 'background.paper', '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 600, px: 2 } }}
+        >
+          <ToggleButton value="daily">Daily</ToggleButton>
+          <ToggleButton value="weekly">Weekly</ToggleButton>
+        </ToggleButtonGroup>
+        <Typography variant="caption" color="text.secondary">
+          {mode === 'daily'
+            ? "Log each day's metrics, or switch to Weekly to add whole-week totals (great for backfilling)."
+            : 'Add totals for a whole week at once — past weeks too. These fill the daily trend so you have a complete picture.'}
+        </Typography>
+      </Box>
+
+      {mode === 'weekly' ? (
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <IconButton size="small" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week">
+              <ChevronLeftIcon />
+            </IconButton>
+            <Typography sx={{ fontWeight: 700, flex: 1, textAlign: 'center' }}>
+              Week of {weekLabel}
+            </Typography>
+            <IconButton size="small" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week">
+              <ChevronRightIcon />
+            </IconButton>
+            <Button size="small" variant="outlined" onClick={() => setWeekStart(startOfWeekLocal())} sx={{ ml: 1, fontWeight: 600 }}>
+              This Week
+            </Button>
+          </Box>
+
+          {weeklyTier && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                Week score: <strong style={{ color: '#2952A3' }}>{formatTierLabel(weeklyTier)}</strong>
+              </Typography>
+            </Box>
+          )}
+
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <StatCard title="Weekly Productivity Totals" interactive>
+                {weeklyFields.map((f) => (
+                  <StepperRow
+                    key={f.key}
+                    label={f.label}
+                    value={(weekly?.[f.key] as number) ?? 0}
+                    onIncrement={() => handleWeeklyStep(f.key, 1)}
+                    onDecrement={() => handleWeeklyStep(f.key, -1)}
+                    min={0}
+                  />
+                ))}
+                <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Task hours come from your shift todo list (submitted ×10).
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                    {weekly
+                      ? (weekly.chats_handled + weekly.emails_handled + weekly.task_hours_submitted * 10 + weekly.internal_notes * 0.5).toFixed(1)
+                      : '0.0'} pts
+                  </Typography>
+                </Box>
+              </StatCard>
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 6 }}>
+              <StatCard title="Weekly Precise Metrics" interactive>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <TextField
+                    label="Escalation Accuracy % (week avg)"
+                    type="number"
+                    defaultValue={weekly?.escalation_accuracy_pct !== null && weekly?.escalation_accuracy_pct !== undefined ? String(weekly.escalation_accuracy_pct) : ''}
+                    placeholder="0–100"
+                    inputProps={{ min: 0, max: 100, step: 0.1 }}
+                    onChange={(e) => handleWeeklyPrecise(e.target.value)}
+                    fullWidth
+                    size="small"
+                    slotProps={{ input: { endAdornment: <InputAdornment position="end">%</InputAdornment> } }}
+                  />
+                </Box>
+              </StatCard>
+
+              <Box sx={{ mt: 2 }}>
+                <StatCard title="Weekly CSAT Ratings" interactive>
+                  <CsatRatingInput
+                    ratings={weekly?.csat_ratings ?? []}
+                    onAdd={handleWeeklyCsat}
+                    onRemove={handleWeeklyCsatRemove}
+                  />
+                </StatCard>
+              </Box>
+
+              {weekly && (
+                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button size="small" color="error" variant="outlined" onClick={handleDeleteWeek}>
+                    Delete this week's data
+                  </Button>
+                </Box>
+              )}
+            </Grid>
+          </Grid>
+        </Box>
+      ) : (
+        <>
       <DateNav date={date} onChange={setDate} datesWithData={datesWithData} />
 
       {score !== null && grade !== null && (
@@ -502,6 +722,8 @@ export default function Today() {
           </Box>
         </Grid>
       </Grid>
+        </>
+      )}
     </Box>
   );
 }

@@ -51,6 +51,7 @@ export default function Coaching() {
   const {
     entries, targets, reflections, journal, coachingPlans,
     upsertCoachingPlan, removeCoachingPlan, notify,
+    remember, coachMemories, coachProfile, updateCoachProfile,
   } = useApp();
 
   const [creating, setCreating] = useState(false);
@@ -61,7 +62,7 @@ export default function Coaching() {
   const [responding, setResponding] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const [profile, setProfile] = useState<CoachProfile | null>(() => loadCoachProfile());
+  const [profile, setProfile] = useState<CoachProfile | null>(coachProfile ?? loadCoachProfile());
   const [editingProfile, setEditingProfile] = useState<CoachProfile | null>(null);
   const [apiKey, setApiKey] = useState(() => loadAiApiKey());
   const [showKey, setShowKey] = useState(false);
@@ -84,10 +85,11 @@ export default function Coaching() {
     setError(null);
     setCreating(true);
     try {
-      const plan = await generateCoachingPlan(entryList.slice(-14), targets, reflections, journal);
+      const plan = await generateCoachingPlan(entryList.slice(-14), targets, reflections, journal, coachMemories);
       setDraft(plan);
       setEditingSteps(plan.action_steps);
       setEditingCadence(plan.cadence_days);
+      if (plan.memory) remember(plan.memory, 'coaching');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate a coaching plan.');
     } finally {
@@ -136,7 +138,8 @@ export default function Coaching() {
         follow_up_prompt: plan.follow_up_prompt,
         source_metric: plan.source_metric,
       };
-      const result = await generateCoachingFollowUp(planDraft, entryList.slice(-7), text);
+      const result = await generateCoachingFollowUp(planDraft, entryList.slice(-7), text, coachMemories);
+      if (result.memory) remember(result.memory, 'coaching');
       const now = new Date().toISOString();
       const nextDate = addDays(todayLocal(), Math.max(1, Math.min(14, result.next_follow_up_days)));
       const updated: CoachingPlan = {
@@ -209,8 +212,20 @@ export default function Coaching() {
       updated_at: new Date().toISOString(),
     };
     saveCoachProfile(updated);
+    updateCoachProfile(updated);
     setProfile(updated);
     setEditingProfile(null);
+    if (!hasProfile) {
+      const facts = [
+        updated.main_goal ? `Main goal right now: ${updated.main_goal}` : '',
+        updated.big_goal ? `Bigger ambition: ${updated.big_goal}` : '',
+        updated.struggles ? `Struggles with: ${updated.struggles}` : '',
+        updated.stress_sources ? `Stressed by: ${updated.stress_sources}` : '',
+        updated.motivation ? `Motivated by: ${updated.motivation}` : '',
+        updated.coaching_style ? `Prefers coaching that: ${updated.coaching_style === 'push' ? 'pushes hard' : updated.coaching_style === 'encourage' ? 'encourages gently' : 'balances push and encouragement'}` : '',
+      ].filter(Boolean);
+      if (facts.length > 0) remember(facts.join('. '), 'profile');
+    }
     notify(hasProfile ? 'Coach profile updated — I will coach to that from now on.' : "Thanks! Now I know you. I'll personalize every coaching plan and message to you.", 'success');
   };
 

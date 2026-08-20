@@ -48,6 +48,7 @@ export default function Growth() {
     entries, targets, reflections, journal, achievements,
     insights, moodCheckins, addJournalEntry, updateJournalEntry,
     dismissInsight, notify, refreshInsights, saveTargetsAndUpdate,
+    remember, coachMemories,
   } = useApp();
 
   const [showSettings, setShowSettings] = useState(false);
@@ -133,11 +134,12 @@ export default function Growth() {
 
     setJournalLoading(true);
     try {
-      const result = await generateJournalResponse(msg, journal, entryList.slice(-7), targets);
+      const result = await generateJournalResponse(msg, journal, entryList.slice(-7), targets, coachMemories);
       updateJournalEntry(tempEntry.id, {
         ai_response: result.response,
         category: result.category as JournalCategory,
       });
+      if (result.memory) remember(result.memory, 'journal');
       refreshInsights();
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Failed to get a response.';

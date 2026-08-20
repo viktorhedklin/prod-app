@@ -203,7 +203,7 @@ function MetricBar({ label, value, tier, weight, metricKey }: {
 }
 
 export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboard' | 'today' | 'tasks' | 'escalations' | 'reflection' | 'growth') => void }) {
-  const { entries, tasks, escalations, targets, reflections, qaEntries } = useApp();
+  const { entries, tasks, escalations, targets, reflections, qaEntries, coachMemories } = useApp();
   const { updateTask, updateEscalation } = useApp();
   const [period, setPeriod] = useState<PeriodType>('today');
   const [dismissedItems, setDismissedItems] = useState<Set<string>>(new Set());
@@ -223,7 +223,7 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
     if (entryList.length === 0) return;
     let cancelled = false;
     setFocusLoading(true);
-    generateDailyFocus(entryList.slice(-7), targets)
+    generateDailyFocus(entryList.slice(-7), targets, coachMemories)
       .then((focus) => { if (!cancelled) { setDailyFocus(focus); setFocusLoading(false); } })
       .catch(() => { if (!cancelled) { setDailyFocus('Log your metrics to receive a personalized focus area.'); setFocusLoading(false); } });
     return () => { cancelled = true; };

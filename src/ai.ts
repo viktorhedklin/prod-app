@@ -1,4 +1,4 @@
-import type { DailyEntry, KPITarget, JournalEntry, Reflection, Tier, CoachProfile } from './types';
+import type { DailyEntry, KPITarget, JournalEntry, Reflection, Tier, CoachProfile, CoachMemory } from './types';
 import { aggregateEntries, tierFromValue, formatTierLabel } from './grading';
 import { loadAiApiKey, loadCoachProfile } from './storage';
 
@@ -41,11 +41,21 @@ function buildProfileBlock(profile: CoachProfile | null): string {
     .join('\n');
 }
 
-function buildCoachContext(): string {
-  return buildProfileBlock(loadCoachProfile());
+function buildCoachContext(memories?: CoachMemory[]): string {
+  const profile = loadCoachProfile();
+  const parts: string[] = [buildProfileBlock(profile)];
+  if (memories && memories.length > 0) {
+    parts.push(
+      [
+        `\nLong-term memories about this person that you have gathered over time — reference these to be consistent and to show you remember them:`,
+        ...memories.slice(0, 20).map((m) => `- ${m.content}`),
+      ].join('\n'),
+    );
+  }
+  return parts.filter(Boolean).join('\n');
 }
 
-async function callOpenAI(messages: OpenAIMessage[], temperature: number = 0.7): Promise<string> {
+async function callOpenAI(messages: OpenAIMessage[], temperature: number = 0.7, maxTokens: number = 1200): Promise<string> {
   const apiKey = loadAiApiKey();
   if (!apiKey) {
     throw new Error('No AI Engine API key configured. You can add one in the My Growth settings.');
@@ -63,6 +73,7 @@ async function callOpenAI(messages: OpenAIMessage[], temperature: number = 0.7):
       model: MODEL,
       messages,
       temperature,
+      max_tokens: maxTokens,
     }),
   });
 
@@ -153,6 +164,7 @@ function identifyWeakestMetrics(
 export async function generateReflectionQuestions(
   entry: DailyEntry,
   targets: KPITarget[],
+  memories?: CoachMemory[],
 ): Promise<string[]> {
   const daySummary = buildDaySummary(entry, targets);
   const weakest = identifyWeakestMetrics(entry, targets);
@@ -163,7 +175,7 @@ export async function generateReflectionQuestions(
 
   const systemPrompt = `${COACH_PERSONA}
 
-${buildCoachContext()}
+${buildCoachContext(memories)}
 
 You are generating 4-6 thoughtful reflection questions that help them reflect on their workday. Tailor questions to their actual performance data AND to their personal profile (struggles, stressors, goals). Ask about weak areas with curiosity, not judgment. Ask about strong areas to reinforce good habits. Include at least one question about their emotional state or stress. Keep questions concise, personal, and specific. Return ONLY a JSON array of question strings, no other text.`;
 
@@ -201,6 +213,7 @@ You are generating 4-6 thoughtful reflection questions that help them reflect on
 export interface AiTipResult {
   tips: Array<{ metric: string; tip: string; priority: 'high' | 'medium' | 'low' }>;
   summary: string;
+  memory?: string;
 }
 
 export async function generateReflectionTips(
@@ -210,6 +223,7 @@ export async function generateReflectionTips(
   answers: string[],
   score: number | null,
   grade: Tier | null,
+  memories?: CoachMemory[],
 ): Promise<AiTipResult> {
   const daySummary = buildDaySummary(entry, targets);
   const weakest = identifyWeakestMetrics(entry, targets);
@@ -220,10 +234,10 @@ export async function generateReflectionTips(
 
   const systemPrompt = `${COACH_PERSONA}
 
-${buildCoachContext()}
+${buildCoachContext(memories)}
 
 Based on their day's data and their reflection answers, generate personalized, actionable tips to help them improve. Each tip should be specific, practical, and reference both the data and what you know about them. Return a JSON object with this exact shape:
-{"tips": [{"metric": "metric name", "tip": "specific actionable advice", "priority": "high"|"medium"|"low"}], "summary": "a 2-3 sentence encouraging summary of their day that pushes them forward"}
+{"tips": [{"metric": "metric name", "tip": "specific actionable advice", "priority": "high"|"medium"|"low"}], "summary": "a 2-3 sentence encouraging summary of their day that pushes them forward", "memory": "ONE short durable fact you learned about this person from their reflection today that you should remember long-term (e.g. a struggle, a motivation, a preference). If nothing durable, return an empty string."}
 Generate 3-5 tips. Focus high priority tips on the weakest metrics. Return ONLY valid JSON, no other text.`;
 
   const userPrompt = `Day summary:\n${daySummary}\n\nOverall score: ${score?.toFixed(2) ?? 'N/A'}/5.00, Grade: ${grade ? formatTierLabel(grade) : 'N/A'}\n\nWeakest metrics: ${weakest.length > 0 ? weakest.map((w) => `${w.label} (${formatTierLabel(w.tier)})`).join(', ') : 'None'}\n\nReflection Q&A:\n${qaPairs}\n\nGenerate personalized tips and a summary. Return JSON.`;
@@ -243,6 +257,7 @@ Generate 3-5 tips. Focus high priority tips on the weakest metrics. Return ONLY 
       return {
         tips: parsed.tips.slice(0, 5),
         summary: parsed.summary,
+        memory: typeof parsed.memory === 'string' && parsed.memory.trim() ? parsed.memory.trim() : undefined,
       };
     }
   } catch {
@@ -264,7 +279,8 @@ export async function generateJournalResponse(
   recentJournal: JournalEntry[],
   recentEntries: DailyEntry[],
   targets: KPITarget[],
-): Promise<{ response: string; category: string }> {
+  memories?: CoachMemory[],
+): Promise<{ response: string; category: string; memory?: string }> {
   const recentContext = recentJournal
     .slice(-5)
     .map((j) => `User: ${j.user_message}\nCoach: ${j.ai_response ?? ''}`)
@@ -278,9 +294,9 @@ export async function generateJournalResponse(
 
   const systemPrompt = `${COACH_PERSONA}
 
-${buildCoachContext()}
+${buildCoachContext(memories)}
 
-The person is sharing their thoughts, feelings, struggles, strengths, or concerns with you. Respond with genuine empathy, encouragement, and practical insight. Push them toward their goals, connect what they say to their performance data and to their profile, and keep them motivated. If they're stressed, first acknowledge and validate, then give one concrete next step. Keep responses concise (2-4 sentences) but meaningful. Ask a thoughtful follow-up question when appropriate. Return a JSON object with this exact shape: {"response": "your coaching response", "category": "stress|strength|weakness|win|concern|general"}. Return ONLY valid JSON.`;
+The person is sharing their thoughts, feelings, struggles, strengths, or concerns with you. Respond with genuine empathy, encouragement, and practical insight. Push them toward their goals, connect what they say to their performance data and to their profile, and keep them motivated. If they're stressed, first acknowledge and validate, then give one concrete next step. Keep responses concise (2-4 sentences) but meaningful. Ask a thoughtful follow-up question when appropriate. Return a JSON object with this exact shape: {"response": "your coaching response", "category": "stress|strength|weakness|win|concern|general", "memory": "ONE short durable fact about this person you learned from this message that you should remember long-term. If nothing durable, return an empty string."}. Return ONLY valid JSON.`;
 
   const userPrompt = `Recent conversation context:\n${recentContext || '(start of conversation)'}\n\nRecent performance data:\n${performanceContext || '(no data yet)'}\n\nNew message from the agent:\n${userMessage}\n\nRespond as their coach. Return JSON with "response" and "category".`;
 
@@ -299,6 +315,7 @@ The person is sharing their thoughts, feelings, struggles, strengths, or concern
       return {
         response: parsed.response,
         category: typeof parsed.category === 'string' ? parsed.category : 'general',
+        memory: typeof parsed.memory === 'string' && parsed.memory.trim() ? parsed.memory.trim() : undefined,
       };
     }
   } catch {
@@ -314,6 +331,7 @@ The person is sharing their thoughts, feelings, struggles, strengths, or concern
 export async function generateDailyFocus(
   recentEntries: DailyEntry[],
   targets: KPITarget[],
+  memories?: CoachMemory[],
 ): Promise<string> {
   if (recentEntries.length === 0) {
     return 'Start logging your daily metrics to receive a personalized focus area.';
@@ -358,7 +376,7 @@ export async function generateDailyFocus(
           role: 'system',
           content: `${COACH_PERSONA}
 
-${buildCoachContext()}
+${buildCoachContext(memories)}
 
 Write ONE short, sharp daily focus sentence. It should name the main area to work on today, reference the data and what you know about them, and end with a concrete next step. Make it motivating and direct. Return only plain text, no bullets, no preamble.`,
         },
@@ -393,12 +411,14 @@ export interface CoachingPlanDraft {
   cadence_days: number;
   follow_up_prompt: string;
   source_metric: string | null;
+  memory?: string;
 }
 
 export interface CoachingFollowUpResult {
   coach_response: string;
   next_follow_up_days: number;
   status: 'active' | 'paused' | 'completed';
+  memory?: string;
 }
 
 export async function generateCoachingPlan(
@@ -406,6 +426,7 @@ export async function generateCoachingPlan(
   targets: KPITarget[],
   reflections: Record<string, Reflection>,
   journal: JournalEntry[],
+  memories?: CoachMemory[],
 ): Promise<CoachingPlanDraft> {
   const weakest = identifyWeakestMetrics(
     recentEntries[recentEntries.length - 1] ?? ({ date: '', chats_handled: 0, emails_handled: 0, seek_feedback: 0, tasks_handled: 0, task_hours_logged: 0, task_hours_submitted: 0, internal_notes: 0, csat_ratings: [], escalations_raised: 0, escalation_accuracy_pct: null } as DailyEntry),
@@ -427,9 +448,9 @@ export async function generateCoachingPlan(
             role: 'system',
             content: `${COACH_PERSONA}
 
-${buildCoachContext()}
+${buildCoachContext(memories)}
 
-You are a coaching planner. Based on recent performance data AND the person's profile (goals, struggles, stressors, motivation), write a concrete, personalized improvement plan as JSON with fields focus_area, goal, why_it_matters, action_steps (3-4 short items), cadence_days (1-7), follow_up_prompt, and source_metric. The plan should push them toward their stated goals and address their real struggles. Return only valid JSON.`,
+You are a coaching planner. Based on recent performance data AND the person's profile (goals, struggles, stressors, motivation), write a concrete, personalized improvement plan as JSON with fields focus_area, goal, why_it_matters, action_steps (3-4 short items), cadence_days (1-7), follow_up_prompt, source_metric, and memory (ONE short durable fact about this person you learned or confirmed while planning, or empty string if nothing durable). The plan should push them toward their stated goals and address their real struggles. Return only valid JSON.`,
           },
           {
             role: 'user',
@@ -459,6 +480,7 @@ You are a coaching planner. Based on recent performance data AND the person's pr
             ? parsed.follow_up_prompt
             : `How is your work going on ${parsed.focus_area}? What have you done so far, and what do you need from me?`,
           source_metric: typeof parsed.source_metric === 'string' ? parsed.source_metric : weakestMetric?.metric_key ?? null,
+          memory: typeof parsed.memory === 'string' && parsed.memory.trim() ? parsed.memory.trim() : undefined,
         };
       }
     }
@@ -492,6 +514,7 @@ export async function generateCoachingFollowUp(
   plan: CoachingPlanDraft,
   recentEntries: DailyEntry[],
   userResponse: string,
+  memories?: CoachMemory[],
 ): Promise<CoachingFollowUpResult> {
   const recentSummary = recentEntries
     .slice(-7)
@@ -506,9 +529,9 @@ export async function generateCoachingFollowUp(
             role: 'system',
             content: `${COACH_PERSONA}
 
-${buildCoachContext()}
+${buildCoachContext(memories)}
 
-Read the current plan, recent performance, and the person's response. Respond as their follow-up check-in: acknowledge what they've done, push them on gaps, reference their profile and data, and keep them motivated and accountable. Return JSON with coach_response, next_follow_up_days, and status (active, paused, completed). Keep the tone direct, warm, and useful.`,
+Read the current plan, recent performance, and the person's response. Respond as their follow-up check-in: acknowledge what they've done, push them on gaps, reference their profile and data, and keep them motivated and accountable. Return JSON with coach_response, next_follow_up_days, status (active, paused, completed), and memory (ONE short durable fact about this person you learned or confirmed from this check-in, or empty string if nothing durable). Keep the tone direct, warm, and useful.`,
           },
           {
             role: 'user',
@@ -525,6 +548,7 @@ Read the current plan, recent performance, and the person's response. Respond as
           coach_response: parsed.coach_response,
           next_follow_up_days: Math.max(1, Math.min(14, Number(parsed.next_follow_up_days) || plan.cadence_days)),
           status: parsed.status === 'paused' || parsed.status === 'completed' ? parsed.status : 'active',
+          memory: typeof parsed.memory === 'string' && parsed.memory.trim() ? parsed.memory.trim() : undefined,
         };
       }
     }

@@ -29,7 +29,7 @@ export default function Reflection() {
   const {
     entries, targets, tasks, escalations,
     saveReflection, getReflection, addMoodCheckIn, getMoodForDate,
-    notify, refreshInsights,
+    notify, refreshInsights, remember, coachMemories,
   } = useApp();
   const date = today();
   const entry = entries[date];
@@ -79,7 +79,7 @@ export default function Reflection() {
     setError(null);
     setLoadingQuestions(true);
     try {
-      const generatedQuestions = await generateReflectionQuestions(entry!, targets);
+      const generatedQuestions = await generateReflectionQuestions(entry!, targets, coachMemories);
       setQuestions(generatedQuestions);
       setAnswers(new Array(generatedQuestions.length).fill(''));
       setPhase('questions');
@@ -107,9 +107,10 @@ export default function Reflection() {
     setError(null);
     setLoadingTips(true);
     try {
-      const result = await generateReflectionTips(entry!, targets, questions, answers, score, grade);
+      const result = await generateReflectionTips(entry!, targets, questions, answers, score, grade, coachMemories);
       setTips(result.tips);
       setAiSummary(result.summary);
+      if (result.memory) remember(result.memory, 'reflection');
       setPhase('tips');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate tips.');

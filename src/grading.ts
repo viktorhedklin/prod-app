@@ -1,4 +1,4 @@
-import type { DailyEntry, KPITarget, Tier, Thresholds, GradeResult, MetricBreakdown, TaskItem, EscalationItem } from './types';
+import type { DailyEntry, KPITarget, Tier, Thresholds, GradeResult, MetricBreakdown, TaskItem, EscalationItem, WeeklyEntry } from './types';
 
 export const TIER_POINTS: Record<Tier, number> = {
   S: 5,
@@ -197,4 +197,44 @@ export function getOpenShiftItems(
 export function formatTierLabel(tier: Tier): string {
   if (tier === 'A_plus') return 'A+';
   return tier;
+}
+
+export function weekDays(weekStart: string): string[] {
+  const [y, m, d] = weekStart.split('-').map((n) => Number(n));
+  const days: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const dt = new Date(y, m - 1, d + i, 12, 0, 0, 0);
+    days.push(
+      `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`,
+    );
+  }
+  return days;
+}
+
+export function expandWeeklyEntries(
+  entries: Record<string, DailyEntry>,
+  weeklyEntries: Record<string, WeeklyEntry>,
+): Record<string, DailyEntry> {
+  const merged: Record<string, DailyEntry> = { ...entries };
+  for (const week of Object.values(weeklyEntries)) {
+    const days = weekDays(week.week_start);
+    for (const day of days) {
+      if (merged[day]) continue;
+      const perDay = (v: number) => v / days.length;
+      merged[day] = {
+        date: day,
+        chats_handled: perDay(week.chats_handled),
+        emails_handled: perDay(week.emails_handled),
+        seek_feedback: perDay(week.seek_feedback),
+        tasks_handled: perDay(week.tasks_handled),
+        task_hours_logged: perDay(week.task_hours_logged),
+        task_hours_submitted: perDay(week.task_hours_submitted),
+        internal_notes: perDay(week.internal_notes),
+        csat_ratings: week.csat_ratings,
+        escalations_raised: perDay(week.escalations_raised),
+        escalation_accuracy_pct: week.escalation_accuracy_pct,
+      };
+    }
+  }
+  return merged;
 }

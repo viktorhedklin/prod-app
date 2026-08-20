@@ -13,10 +13,15 @@ import type {
   QaEntry,
   CoachingPlan,
   CoachProfile,
+  WeeklyEntry,
+  CoachMemory,
 } from './types';
 import { DEFAULT_KPI_TARGETS, makeEmptyEntry } from './defaults';
 
 function genId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
@@ -67,6 +72,63 @@ export async function saveEntry(date: string, entry: DailyEntry): Promise<void> 
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
+}
+
+// --- Weekly Entries ---
+
+function normalizeWeeklyEntry(weekStart: string, raw: Record<string, unknown>): WeeklyEntry {
+  const num = (v: unknown, fallback = 0): number => (typeof v === 'number' ? v : fallback);
+  return {
+    week_start: weekStart,
+    chats_handled: num(raw.chats_handled),
+    emails_handled: num(raw.emails_handled),
+    seek_feedback: num(raw.seek_feedback),
+    tasks_handled: num(raw.tasks_handled),
+    task_hours_logged: num(raw.task_hours_logged),
+    task_hours_submitted: num(raw.task_hours_submitted),
+    internal_notes: num(raw.internal_notes),
+    csat_ratings: Array.isArray(raw.csat_ratings) ? (raw.csat_ratings as number[]) : [],
+    escalations_raised: num(raw.escalations_raised),
+    escalation_accuracy_pct: typeof raw.escalation_accuracy_pct === 'number' ? raw.escalation_accuracy_pct : null,
+    created_at: typeof raw.created_at === 'string' ? raw.created_at : new Date().toISOString(),
+    updated_at: typeof raw.updated_at === 'string' ? raw.updated_at : new Date().toISOString(),
+  };
+}
+
+export async function loadWeeklyEntries(): Promise<Record<string, WeeklyEntry>> {
+  const { data, error } = await supabase.from('weekly_entries').select('*').order('week_start', { ascending: true });
+  if (error) throw error;
+  const map: Record<string, WeeklyEntry> = {};
+  for (const row of data ?? []) {
+    map[row.week_start] = normalizeWeeklyEntry(row.week_start, row as unknown as Record<string, unknown>);
+  }
+  return map;
+}
+
+export async function saveWeeklyEntry(weekStart: string, entry: Omit<WeeklyEntry, 'created_at' | 'updated_at'>): Promise<void> {
+  const { error } = await supabase.from('weekly_entries').upsert(
+    {
+      week_start: weekStart,
+      chats_handled: entry.chats_handled,
+      emails_handled: entry.emails_handled,
+      seek_feedback: entry.seek_feedback,
+      tasks_handled: entry.tasks_handled,
+      task_hours_logged: entry.task_hours_logged,
+      task_hours_submitted: entry.task_hours_submitted,
+      internal_notes: entry.internal_notes,
+      csat_ratings: entry.csat_ratings ?? [],
+      escalations_raised: entry.escalations_raised,
+      escalation_accuracy_pct: entry.escalation_accuracy_pct,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'week_start' },
+  );
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteWeeklyEntry(weekStart: string): Promise<void> {
+  const { error } = await supabase.from('weekly_entries').delete().eq('week_start', weekStart);
+  if (error) throw new Error(error.message);
 }
 
 // --- CSAT Notes ---
@@ -385,11 +447,13 @@ export function saveAiApiKey(key: string): void {
   }
 }
 
-// --- Coach Profile (stays in localStorage — personal coaching context) ---
+// --- Coach Profile (Supabase-backed so it survives browser wipes; localStorage is a cache) ---
+
+const COACH_PROFILE_LOCAL_KEY = 'pg_coach_profile';
 
 export function loadCoachProfile(): CoachProfile | null {
   try {
-    const raw = localStorage.getItem('pg_coach_profile');
+    const raw = localStorage.getItem(COACH_PROFILE_LOCAL_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CoachProfile;
     if (typeof parsed !== 'object' || parsed === null) return null;
@@ -401,18 +465,101 @@ export function loadCoachProfile(): CoachProfile | null {
 
 export function saveCoachProfile(profile: CoachProfile): void {
   try {
-    localStorage.setItem('pg_coach_profile', JSON.stringify(profile));
+    localStorage.setItem(COACH_PROFILE_LOCAL_KEY, JSON.stringify(profile));
+  } catch {
+    // non-fatal
+  }
+  // Persist to Supabase as the source of truth so it can never be wiped.
+  saveCoachProfileDb(profile).catch(() => {});
+}
+
+export function clearCoachProfile(): void {
+  try {
+    localStorage.removeItem(COACH_PROFILE_LOCAL_KEY);
   } catch {
     // non-fatal
   }
 }
 
-export function clearCoachProfile(): void {
-  try {
-    localStorage.removeItem('pg_coach_profile');
-  } catch {
-    // non-fatal
-  }
+const COACH_PROFILE_DB_ID = 'single';
+
+export async function loadCoachProfileDb(): Promise<CoachProfile | null> {
+  const { data, error } = await supabase.from('coach_profile').select('*').eq('id', COACH_PROFILE_DB_ID).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  const profile: CoachProfile = {
+    role: typeof data.role === 'string' ? data.role : '',
+    main_goal: typeof data.main_goal === 'string' ? data.main_goal : '',
+    big_goal: typeof data.big_goal === 'string' ? data.big_goal : '',
+    strengths: typeof data.strengths === 'string' ? data.strengths : '',
+    struggles: typeof data.struggles === 'string' ? data.struggles : '',
+    stress_sources: typeof data.stress_sources === 'string' ? data.stress_sources : '',
+    motivation: typeof data.motivation === 'string' ? data.motivation : '',
+    demotivators: typeof data.demotivators === 'string' ? data.demotivators : '',
+    coaching_style: (data.coaching_style === 'push' || data.coaching_style === 'encourage' || data.coaching_style === 'balanced')
+      ? data.coaching_style
+      : 'balanced',
+    context: typeof data.context === 'string' ? data.context : '',
+    onboarding_complete: !!data.onboarding_complete,
+    created_at: typeof data.created_at === 'string' ? data.created_at : new Date().toISOString(),
+    updated_at: typeof data.updated_at === 'string' ? data.updated_at : new Date().toISOString(),
+  };
+  return profile;
+}
+
+export async function saveCoachProfileDb(profile: CoachProfile): Promise<void> {
+  const { error } = await supabase.from('coach_profile').upsert(
+    {
+      id: COACH_PROFILE_DB_ID,
+      role: profile.role,
+      main_goal: profile.main_goal,
+      big_goal: profile.big_goal,
+      strengths: profile.strengths,
+      struggles: profile.struggles,
+      stress_sources: profile.stress_sources,
+      motivation: profile.motivation,
+      demotivators: profile.demotivators,
+      coaching_style: profile.coaching_style,
+      context: profile.context,
+      onboarding_complete: profile.onboarding_complete,
+      created_at: profile.created_at,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'id' },
+  );
+  if (error) throw new Error(error.message);
+}
+
+// --- Coach Memory (persistent, growing memory stored in Supabase) ---
+
+export async function loadCoachMemories(): Promise<CoachMemory[]> {
+  const { data, error } = await supabase
+    .from('coach_memories')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(60);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    content: typeof r.content === 'string' ? r.content : '',
+    source: typeof r.source === 'string' ? r.source : 'general',
+    created_at: r.created_at,
+  }));
+}
+
+export async function addCoachMemory(content: string, source = 'general'): Promise<void> {
+  if (!content || !content.trim()) return;
+  const { error } = await supabase.from('coach_memories').insert({
+    id: genId(),
+    content: content.trim(),
+    source,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function clearCoachMemories(): Promise<void> {
+  const { error } = await supabase.from('coach_memories').delete().neq('id', '');
+  if (error) throw new Error(error.message);
 }
 
 // --- Counters (stored as single-row metadata) ---

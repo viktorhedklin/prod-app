@@ -12,6 +12,29 @@ export interface DailyEntry {
   escalation_accuracy_pct: number | null;
 }
 
+export interface WeeklyEntry {
+  week_start: string;
+  chats_handled: number;
+  emails_handled: number;
+  seek_feedback: number;
+  tasks_handled: number;
+  task_hours_logged: number;
+  task_hours_submitted: number;
+  internal_notes: number;
+  csat_ratings: number[];
+  escalations_raised: number;
+  escalation_accuracy_pct: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CoachMemory {
+  id: string;
+  content: string;
+  source: string;
+  created_at: string;
+}
+
 export interface QaEntry {
   week_start: string;
   cases_reviewed: number;

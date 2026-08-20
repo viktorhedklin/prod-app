@@ -18,6 +18,9 @@ import type {
   Achievement,
   QaEntry,
   CoachingPlan,
+  CoachProfile,
+  WeeklyEntry,
+  CoachMemory,
 } from './types';
 import { makeEmptyEntry } from './defaults';
 import {
@@ -33,6 +36,8 @@ import {
   loadAchievements, saveAchievement,
   loadQaEntries, saveQaEntry, deleteQaEntry,
   loadCoachingPlans, saveCoachingPlan, deleteCoachingPlan,
+  loadWeeklyEntries, saveWeeklyEntry, deleteWeeklyEntry,
+  loadCoachProfileDb, saveCoachProfileDb, loadCoachMemories, addCoachMemory,
   nextTaskId, nextEscalationId,
   genId,
 } from './storage';
@@ -40,9 +45,11 @@ import {
   generateRuleBasedInsights,
   checkAchievements,
 } from './insights';
+import { expandWeeklyEntries } from './grading';
 
 interface AppState {
   entries: Record<string, DailyEntry>;
+  weeklyEntries: Record<string, WeeklyEntry>;
   csatNotes: CsatNote[];
   tasks: TaskItem[];
   escalations: EscalationItem[];
@@ -57,6 +64,8 @@ interface AppState {
   insights: Insight[];
   achievements: Achievement[];
   dismissedInsightIds: Set<string>;
+  coachProfile: CoachProfile | null;
+  coachMemories: CoachMemory[];
 }
 
 interface Toast {
@@ -87,6 +96,10 @@ interface AppContextValue extends AppState {
   removeQaEntry: (weekStart: string) => void;
   upsertCoachingPlan: (plan: CoachingPlan) => void;
   removeCoachingPlan: (id: string) => void;
+  saveWeeklyEntry: (weekStart: string, entry: Omit<WeeklyEntry, 'created_at' | 'updated_at'>) => void;
+  deleteWeeklyEntry: (weekStart: string) => void;
+  updateCoachProfile: (profile: CoachProfile) => void;
+  remember: (content: string, source?: string) => void;
   addJournalEntry: (entry: Omit<JournalEntry, 'id' | 'created_at'>) => JournalEntry;
   updateJournalEntry: (id: string, patch: Partial<JournalEntry>) => void;
   addInsight: (insight: Omit<Insight, 'id' | 'created_at' | 'dismissed'>) => void;
@@ -100,6 +113,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 const EMPTY_STATE: AppState = {
   entries: {},
+  weeklyEntries: {},
   csatNotes: [],
   tasks: [],
   escalations: [],
@@ -114,6 +128,8 @@ const EMPTY_STATE: AppState = {
   insights: [],
   achievements: [],
   dismissedInsightIds: new Set(),
+  coachProfile: null,
+  coachMemories: [],
 };
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -131,6 +147,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const [
           entries, csatNotes, tasks, escalations, targets,
           moodCheckins, reflections, journal, insights, achievements, qaEntries, coachingPlans,
+          weeklyEntries, coachProfile, coachMemories,
         ] = await Promise.all([
           loadEntries(),
           loadCsatNotes(),
@@ -144,12 +161,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           loadAchievements(),
           loadQaEntries(),
           loadCoachingPlans(),
+          loadWeeklyEntries(),
+          loadCoachProfileDb(),
+          loadCoachMemories(),
         ]);
 
         if (cancelled) return;
 
         setState({
           entries,
+          weeklyEntries,
           csatNotes,
           tasks,
           escalations,
@@ -164,6 +185,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           insights,
           achievements,
           dismissedInsightIds: new Set(insights.filter((i) => i.dismissed).map((i) => i.id)),
+          coachProfile,
+          coachMemories,
         });
         setLoading(false);
       } catch (err) {
@@ -510,6 +533,47 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [notify]);
 
+  const saveWeeklyEntryAction = useCallback((weekStart: string, entry: Omit<WeeklyEntry, 'created_at' | 'updated_at'>) => {
+    setState((prev) => {
+      const now = new Date().toISOString();
+      const existing = prev.weeklyEntries[weekStart];
+      const full: WeeklyEntry = {
+        ...entry,
+        week_start: weekStart,
+        created_at: existing?.created_at ?? now,
+        updated_at: now,
+      };
+      const nextWeekly = { ...prev.weeklyEntries, [weekStart]: full };
+      saveWeeklyEntry(weekStart, full).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
+      return { ...prev, weeklyEntries: nextWeekly };
+    });
+  }, [notify]);
+
+  const deleteWeeklyEntryAction = useCallback((weekStart: string) => {
+    setState((prev) => {
+      const nextWeekly = { ...prev.weeklyEntries };
+      delete nextWeekly[weekStart];
+      deleteWeeklyEntry(weekStart).catch((e) => notify(`Delete failed: ${e.message}`, 'error'));
+      return { ...prev, weeklyEntries: nextWeekly };
+    });
+  }, [notify]);
+
+  const updateCoachProfile = useCallback((profile: CoachProfile) => {
+    setState((prev) => ({ ...prev, coachProfile: profile }));
+    saveCoachProfileDb(profile).catch((e) => notify(`Profile save failed: ${e.message}`, 'error'));
+  }, [notify]);
+
+  const remember = useCallback((content: string, source = 'general') => {
+    if (!content || !content.trim()) return;
+    addCoachMemory(content, source)
+      .then(() => {
+        loadCoachMemories()
+          .then((memories) => setState((prev) => ({ ...prev, coachMemories: memories })))
+          .catch(() => {});
+      })
+      .catch(() => {});
+  }, []);
+
   const addJournalEntry = useCallback((entry: Omit<JournalEntry, 'id' | 'created_at'>): JournalEntry => {
     const newEntry: JournalEntry = {
       ...entry,
@@ -661,6 +725,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <AppContext.Provider
       value={{
         ...state,
+        entries: expandWeeklyEntries(state.entries, state.weeklyEntries),
         loading,
         loadError,
         updateEntry,
@@ -682,6 +747,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         removeQaEntry,
         upsertCoachingPlan,
         removeCoachingPlan,
+        saveWeeklyEntry: saveWeeklyEntryAction,
+        deleteWeeklyEntry: deleteWeeklyEntryAction,
+        updateCoachProfile,
+        remember,
         addJournalEntry,
         updateJournalEntry,
         addInsight,
