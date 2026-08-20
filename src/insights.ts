@@ -163,6 +163,111 @@ export function generateRuleBasedInsights(
     }
   }
 
+  // 7. Productivity trend
+  if (entryList.length >= 6) {
+    const half = Math.floor(entryList.length / 2);
+    const older = entryList.slice(0, half);
+    const newer = entryList.slice(half);
+    const olderAvg = older.reduce((s, e) => s + e.chats_handled + e.emails_handled + e.task_hours_submitted * 10 + e.internal_notes * 0.5, 0) / older.length;
+    const newerAvg = newer.reduce((s, e) => s + e.chats_handled + e.emails_handled + e.task_hours_submitted * 10 + e.internal_notes * 0.5, 0) / newer.length;
+    if (Math.abs(newerAvg - olderAvg) >= 2) {
+      const direction = newerAvg > olderAvg ? 'improving' : 'declining';
+      const title = `Productivity is ${direction}`;
+      if (!existingInsightTitles.has(title)) {
+        insights.push({
+          id: genId(),
+          insight_type: 'pattern',
+          title,
+          body: `Your average daily productivity points have ${direction} from ${olderAvg.toFixed(1)} to ${newerAvg.toFixed(1)}. ${newerAvg > olderAvg ? 'Keep up the momentum and see what is driving the gains.' : 'Look at the last few days to spot what changed.'}`,
+          severity: newerAvg > olderAvg ? 'info' : 'warning',
+          dismissed: false,
+          created_at: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
+  // 8. Best weekday
+  if (entryList.length >= 5) {
+    const byWeekday: Record<number, number[]> = {};
+    for (const e of entryList) {
+      const dow = new Date(e.date + 'T00:00:00').getDay();
+      const pts = e.chats_handled + e.emails_handled + e.task_hours_submitted * 10 + e.internal_notes * 0.5;
+      (byWeekday[dow] ??= []).push(pts);
+    }
+    const entries = Object.entries(byWeekday).filter(([, pts]) => pts.length >= 2);
+    if (entries.length >= 2) {
+      const best = entries.reduce((a, b) =>
+        b[1].reduce((s, p) => s + p, 0) / b[1].length > a[1].reduce((s, p) => s + p, 0) / a[1].length ? b : a,
+      );
+      const worst = entries.reduce((a, b) =>
+        b[1].reduce((s, p) => s + p, 0) / b[1].length < a[1].reduce((s, p) => s + p, 0) / a[1].length ? b : a,
+      );
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      if (best[0] !== worst[0]) {
+        const bestAvg = best[1].reduce((s, p) => s + p, 0) / best[1].length;
+        const worstAvg = worst[1].reduce((s, p) => s + p, 0) / worst[1].length;
+        const title = `${dayNames[Number(best[0])]} is your most productive day`;
+        if (!existingInsightTitles.has(title)) {
+          insights.push({
+            id: genId(),
+            insight_type: 'pattern',
+            title,
+            body: `You average ${bestAvg.toFixed(1)} productivity points on ${dayNames[Number(best[0])]}s vs ${worstAvg.toFixed(1)} on ${dayNames[Number(worst[0])]}s. If you can, schedule demanding tasks on your strongest days.`,
+            severity: 'info',
+            dismissed: false,
+            created_at: new Date().toISOString(),
+          });
+        }
+      }
+    }
+  }
+
+  // 9. CSAT response rate
+  const workedDays = entryList.filter((e) => e.chats_handled + e.emails_handled > 0);
+  const csatLoggedDays = workedDays.filter((e) => e.csat_ratings.length > 0);
+  if (workedDays.length >= 3 && csatLoggedDays.length > 0) {
+    const rate = (csatLoggedDays.length / workedDays.length) * 100;
+    if (rate < 60) {
+      const title = 'CSAT ratings are going unlogged';
+      if (!existingInsightTitles.has(title)) {
+        insights.push({
+          id: genId(),
+          insight_type: 'pattern',
+          title,
+          body: `You logged CSAT ratings on only ${csatLoggedDays.length} of ${workedDays.length} worked days (${rate.toFixed(0)}%). Rating more days gives you a clearer picture of customer satisfaction trends.`,
+          severity: 'warning',
+          dismissed: false,
+          created_at: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
+  // 10. Task submission lag
+  const lagDays = entryList
+    .filter((e) => e.task_hours_logged > 0 && e.task_hours_submitted >= 0)
+    .slice(-14);
+  if (lagDays.length >= 3) {
+    const lagging = lagDays.filter((e) => e.task_hours_submitted < e.task_hours_logged);
+    const ratio = lagging.length / lagDays.length;
+    if (ratio >= 0.4) {
+      const totalLag = lagDays.reduce((s, e) => s + (e.task_hours_logged - Math.min(e.task_hours_submitted, e.task_hours_logged)), 0);
+      const title = 'Task hours often not submitted same day';
+      if (!existingInsightTitles.has(title)) {
+        insights.push({
+          id: genId(),
+          insight_type: 'pattern',
+          title,
+          body: `On ${lagging.length} of the last ${lagDays.length} days, your submitted task hours were below what you logged (≈${totalLag.toFixed(1)}h in total). Complete your shift task list before logging out to keep submission tight.`,
+          severity: ratio >= 0.7 ? 'warning' : 'info',
+          dismissed: false,
+          created_at: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
   return insights;
 }
 

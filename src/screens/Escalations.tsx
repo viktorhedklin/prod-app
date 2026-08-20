@@ -8,6 +8,7 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
+import InboxIcon from '@mui/icons-material/Inbox';
 import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
 import type { EscalationItem } from '../types';
@@ -256,9 +257,26 @@ export default function Escalations() {
             </Box>
             <Divider sx={{ mb: 1 }} />
             {filtered.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-                No escalations found.
-              </Typography>
+              <Box
+                sx={{
+                  py: 4,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 1,
+                  textAlign: 'center',
+                }}
+              >
+                <InboxIcon sx={{ fontSize: 40, color: 'text.disabled' }} />
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                  No escalations found.
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 320 }}>
+                  {filter === 'all'
+                    ? 'Escalations you log here will appear in this list.'
+                    : 'Try a different filter, or add a new escalation above.'}
+                </Typography>
+              </Box>
             ) : (
               filtered.map((esc) => (
                 <EscalationRow

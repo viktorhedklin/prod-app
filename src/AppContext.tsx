@@ -17,6 +17,7 @@ import type {
   Insight,
   Achievement,
   QaEntry,
+  CoachingPlan,
 } from './types';
 import { makeEmptyEntry } from './defaults';
 import {
@@ -31,6 +32,7 @@ import {
   loadInsights, saveInsight, updateInsightDismissed,
   loadAchievements, saveAchievement,
   loadQaEntries, saveQaEntry, deleteQaEntry,
+  loadCoachingPlans, saveCoachingPlan, deleteCoachingPlan,
   nextTaskId, nextEscalationId,
   genId,
 } from './storage';
@@ -50,6 +52,7 @@ interface AppState {
   moodCheckins: MoodCheckIn[];
   reflections: Record<string, Reflection>;
   qaEntries: Record<string, QaEntry>;
+  coachingPlans: CoachingPlan[];
   journal: JournalEntry[];
   insights: Insight[];
   achievements: Achievement[];
@@ -82,6 +85,8 @@ interface AppContextValue extends AppState {
   getReflection: (date: string) => Reflection | null;
   upsertQaEntry: (weekStart: string, entry: Omit<QaEntry, 'created_at' | 'updated_at'>) => void;
   removeQaEntry: (weekStart: string) => void;
+  upsertCoachingPlan: (plan: CoachingPlan) => void;
+  removeCoachingPlan: (id: string) => void;
   addJournalEntry: (entry: Omit<JournalEntry, 'id' | 'created_at'>) => JournalEntry;
   updateJournalEntry: (id: string, patch: Partial<JournalEntry>) => void;
   addInsight: (insight: Omit<Insight, 'id' | 'created_at' | 'dismissed'>) => void;
@@ -104,6 +109,7 @@ const EMPTY_STATE: AppState = {
   moodCheckins: [],
   reflections: {},
   qaEntries: {},
+  coachingPlans: [],
   journal: [],
   insights: [],
   achievements: [],
@@ -124,7 +130,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         const [
           entries, csatNotes, tasks, escalations, targets,
-          moodCheckins, reflections, journal, insights, achievements, qaEntries,
+          moodCheckins, reflections, journal, insights, achievements, qaEntries, coachingPlans,
         ] = await Promise.all([
           loadEntries(),
           loadCsatNotes(),
@@ -137,6 +143,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           loadInsights(),
           loadAchievements(),
           loadQaEntries(),
+          loadCoachingPlans(),
         ]);
 
         if (cancelled) return;
@@ -152,6 +159,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           moodCheckins,
           reflections,
           qaEntries,
+          coachingPlans,
           journal,
           insights,
           achievements,
@@ -240,15 +248,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     (task: Omit<TaskItem, 'task_id' | 'created_at' | 'submitted_at'>) => {
       setState((prev) => {
         const counter = prev.taskCounter + 1;
+        const newTaskId = nextTaskId(counter);
         const newTask: TaskItem = {
           ...task,
-          task_id: nextTaskId(counter),
+          source_task_id: task.source_task_id ?? newTaskId,
+          completion_date: task.completion_date ?? task.linked_date,
+          task_id: newTaskId,
           created_at: new Date().toISOString(),
           submitted_at: null,
         };
         const nextTasks = [newTask, ...prev.tasks];
         saveTask(newTask).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
-        return { ...prev, tasks: nextTasks, taskCounter: counter };
+        const hours = Number(newTask.task_hours ?? 0);
+        const nextEntries = hours > 0
+          ? adjustEntryHours(prev.entries, newTask.linked_date, 'task_hours_logged', hours)
+          : prev.entries;
+        return { ...prev, tasks: nextTasks, taskCounter: counter, entries: nextEntries };
       });
     },
     [notify],
@@ -263,15 +278,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         t.task_id === task_id ? updated : t,
       );
       saveTask(updated).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
-      return { ...prev, tasks: nextTasks };
+      let nextEntries = prev.entries;
+      const oldHours = Number(task.task_hours ?? 0);
+      const newHours = Number(updated.task_hours ?? 0);
+      const hourDelta = newHours - oldHours;
+
+      if (hourDelta !== 0) {
+        nextEntries = adjustEntryHours(nextEntries, updated.linked_date, 'task_hours_logged', hourDelta);
+      }
+
+      const oldCompletionDate = task.completion_date ?? task.linked_date;
+      const newCompletionDate = updated.completion_date ?? updated.linked_date;
+      if (task.status !== 'submitted' && updated.status === 'submitted') {
+        nextEntries = adjustEntryHours(nextEntries, newCompletionDate, 'task_hours_submitted', newHours);
+      } else if (task.status === 'submitted' && updated.status !== 'submitted') {
+        nextEntries = adjustEntryHours(nextEntries, oldCompletionDate, 'task_hours_submitted', -oldHours);
+      } else if (task.status === 'submitted' && updated.status === 'submitted' && oldCompletionDate !== newCompletionDate) {
+        nextEntries = adjustEntryHours(nextEntries, oldCompletionDate, 'task_hours_submitted', -oldHours);
+        nextEntries = adjustEntryHours(nextEntries, newCompletionDate, 'task_hours_submitted', newHours);
+      } else if (task.status === 'submitted' && updated.status === 'submitted' && hourDelta !== 0) {
+        nextEntries = adjustEntryHours(nextEntries, newCompletionDate, 'task_hours_submitted', hourDelta);
+      }
+
+      return { ...prev, tasks: nextTasks, entries: nextEntries };
     });
   }, [notify]);
 
   const removeTask = useCallback((task_id: string) => {
     setState((prev) => {
+      const task = prev.tasks.find((t) => t.task_id === task_id);
       const nextTasks = prev.tasks.filter((t) => t.task_id !== task_id);
       deleteTask(task_id).catch((e) => notify(`Delete failed: ${e.message}`, 'error'));
-      return { ...prev, tasks: nextTasks };
+      let nextEntries = prev.entries;
+      if (task) {
+        const hours = Number(task.task_hours ?? 0);
+        if (hours > 0) {
+          nextEntries = adjustEntryHours(nextEntries, task.linked_date, 'task_hours_logged', -hours);
+          if (task.status === 'submitted') {
+            nextEntries = adjustEntryHours(
+              nextEntries,
+              task.completion_date ?? task.linked_date,
+              'task_hours_submitted',
+              -hours,
+            );
+          }
+        }
+      }
+      return { ...prev, tasks: nextTasks, entries: nextEntries };
     });
   }, [notify]);
 
@@ -412,6 +465,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       delete nextQa[weekStart];
       deleteQaEntry(weekStart).catch((e) => notify(`Delete failed: ${e.message}`, 'error'));
       return { ...prev, qaEntries: nextQa };
+    });
+  }, [notify]);
+
+  const adjustEntryHours = (
+    entries: Record<string, DailyEntry>,
+    date: string,
+    key: 'task_hours_logged' | 'task_hours_submitted',
+    delta: number,
+  ): Record<string, DailyEntry> => {
+    if (delta === 0) return entries;
+    const existing = entries[date] ?? makeEmptyEntry(date);
+    const updated = {
+      ...existing,
+      [key]: Math.max(0, (existing[key] as number) + delta),
+    } as DailyEntry;
+    const nextEntries = { ...entries, [date]: updated };
+    saveEntry(date, updated).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
+    return nextEntries;
+  };
+
+  const upsertCoachingPlan = useCallback((plan: CoachingPlan) => {
+    setState((prev) => {
+      const now = new Date().toISOString();
+      const existing = prev.coachingPlans.find((p) => p.id === plan.id);
+      const full: CoachingPlan = {
+        ...plan,
+        created_at: existing?.created_at ?? plan.created_at ?? now,
+        updated_at: now,
+      };
+      const nextPlans = existing
+        ? prev.coachingPlans.map((p) => (p.id === full.id ? full : p))
+        : [full, ...prev.coachingPlans];
+      saveCoachingPlan(full).catch((e) => notify(`Save failed: ${e.message}`, 'error'));
+      return { ...prev, coachingPlans: nextPlans };
+    });
+  }, [notify]);
+
+  const removeCoachingPlan = useCallback((id: string) => {
+    setState((prev) => {
+      const nextPlans = prev.coachingPlans.filter((p) => p.id !== id);
+      deleteCoachingPlan(id).catch((e) => notify(`Delete failed: ${e.message}`, 'error'));
+      return { ...prev, coachingPlans: nextPlans };
     });
   }, [notify]);
 
@@ -585,6 +680,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         getReflection,
         upsertQaEntry,
         removeQaEntry,
+        upsertCoachingPlan,
+        removeCoachingPlan,
         addJournalEntry,
         updateJournalEntry,
         addInsight,

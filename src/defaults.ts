@@ -36,20 +36,6 @@ export const DEFAULT_KPI_TARGETS: KPITarget[] = [
     direction: 'higher_is_better',
     thresholds: { S: 97.50, A_plus: 97.00, A: 96.00, B: 94.00, C: 91.00 },
   },
-  {
-    metric_key: 'quiz',
-    label: 'Quiz Score',
-    weight: 0.05,
-    direction: 'higher_is_better',
-    thresholds: { S: 95, A_plus: 90, A: 85, B: 80, C: 0 },
-  },
-  {
-    metric_key: 'punctuality',
-    label: 'Punctuality Points',
-    weight: 0.05,
-    direction: 'higher_is_better',
-    thresholds: { S: 10, A_plus: 9, A: 8, B: 6.5, C: 5 },
-  },
 ];
 
 export function makeEmptyEntry(date: string): DailyEntry {
@@ -61,6 +47,7 @@ export function makeEmptyEntry(date: string): DailyEntry {
     tasks_handled: 0,
     task_hours_logged: 0,
     task_hours_submitted: 0,
+    internal_notes: 0,
     csat_ratings: [],
     escalations_raised: 0,
     escalation_accuracy_pct: null,

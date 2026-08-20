@@ -298,6 +298,16 @@ export default function Reflection() {
                   color: 'primary.contrastText',
                   position: 'relative',
                   overflow: 'hidden',
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    width: 120,
+                    height: 120,
+                    borderRadius: '50%',
+                    right: 20,
+                    bottom: -60,
+                    bgcolor: 'rgba(255,255,255,0.05)',
+                  },
                   '&::after': {
                     content: '""',
                     position: 'absolute',

@@ -11,6 +11,7 @@ import type {
   Insight,
   Achievement,
   QaEntry,
+  CoachingPlan,
 } from './types';
 import { DEFAULT_KPI_TARGETS, makeEmptyEntry } from './defaults';
 
@@ -32,6 +33,7 @@ function normalizeEntry(date: string, raw: Record<string, unknown>): DailyEntry 
     tasks_handled: typeof raw.tasks_handled === 'number' ? raw.tasks_handled : base.tasks_handled,
     task_hours_logged: typeof raw.task_hours_logged === 'number' ? raw.task_hours_logged : base.task_hours_logged,
     task_hours_submitted: typeof raw.task_hours_submitted === 'number' ? raw.task_hours_submitted : base.task_hours_submitted,
+    internal_notes: typeof raw.internal_notes === 'number' ? raw.internal_notes : base.internal_notes,
     csat_ratings: Array.isArray(raw.csat_ratings) ? (raw.csat_ratings as number[]) : base.csat_ratings,
     escalations_raised: typeof raw.escalations_raised === 'number' ? raw.escalations_raised : base.escalations_raised,
     escalation_accuracy_pct: typeof raw.escalation_accuracy_pct === 'number' ? raw.escalation_accuracy_pct : null,
@@ -57,6 +59,7 @@ export async function saveEntry(date: string, entry: DailyEntry): Promise<void> 
     tasks_handled: entry.tasks_handled,
     task_hours_logged: entry.task_hours_logged,
     task_hours_submitted: entry.task_hours_submitted,
+    internal_notes: entry.internal_notes,
     csat_ratings: entry.csat_ratings,
     escalations_raised: entry.escalations_raised,
     escalation_accuracy_pct: entry.escalation_accuracy_pct,
@@ -102,10 +105,12 @@ export async function loadTasks(): Promise<TaskItem[]> {
   if (error) throw error;
   return (data ?? []).map((r) => ({
     task_id: r.task_id,
+    source_task_id: r.source_task_id ?? null,
     brief_explanation: r.brief_explanation,
     submit_to: r.submit_to,
     amount: r.amount,
     task_hours: r.task_hours,
+    completion_date: r.completion_date ?? null,
     status: r.status,
     created_at: r.created_at,
     submitted_at: r.submitted_at,
@@ -117,10 +122,12 @@ export async function loadTasks(): Promise<TaskItem[]> {
 export async function saveTask(task: TaskItem): Promise<void> {
   const { error } = await supabase.from('tasks').upsert({
     task_id: task.task_id,
+    source_task_id: task.source_task_id,
     brief_explanation: task.brief_explanation,
     submit_to: task.submit_to,
     amount: task.amount,
     task_hours: task.task_hours,
+    completion_date: task.completion_date,
     status: task.status,
     created_at: task.created_at,
     submitted_at: task.submitted_at,
@@ -179,7 +186,10 @@ export async function loadTargets(): Promise<KPITarget[]> {
   const { data, error } = await supabase.from('kpi_targets').select('*');
   if (error) throw error;
   if (!data || data.length === 0) return DEFAULT_KPI_TARGETS;
-  return data.map((r) => ({
+  const supported = new Set(DEFAULT_KPI_TARGETS.map((target) => target.metric_key));
+  const filtered = data.filter((r) => supported.has(r.metric_key));
+  if (filtered.length === 0) return DEFAULT_KPI_TARGETS;
+  return filtered.map((r) => ({
     metric_key: r.metric_key,
     label: r.label,
     weight: Number(r.weight),
@@ -407,6 +417,7 @@ export async function loadQaEntries(): Promise<Record<string, QaEntry>> {
       cases_reviewed: row.cases_reviewed ?? 0,
       qa_percentage: row.qa_percentage ?? 0,
       notes: row.notes ?? null,
+      categories: Array.isArray(row.categories) ? (row.categories as string[]) : [],
       created_at: row.created_at,
       updated_at: row.updated_at,
     };
@@ -421,6 +432,7 @@ export async function saveQaEntry(weekStart: string, entry: QaEntry): Promise<vo
       cases_reviewed: entry.cases_reviewed,
       qa_percentage: entry.qa_percentage,
       notes: entry.notes,
+      categories: entry.categories ?? [],
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'week_start' },
@@ -434,4 +446,67 @@ export async function deleteQaEntry(weekStart: string): Promise<void> {
     .delete()
     .eq('week_start', weekStart);
   if (error) throw new Error(error.message);
+}
+
+// --- Coaching Plans ---
+
+function normalizeCheckIns(raw: unknown): CoachingPlan['check_in_history'] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map((item) => ({
+      checked_at: typeof item.checked_at === 'string' ? item.checked_at : new Date().toISOString(),
+      prompt: typeof item.prompt === 'string' ? item.prompt : '',
+      user_response: typeof item.user_response === 'string' ? item.user_response : '',
+      coach_response: typeof item.coach_response === 'string' ? item.coach_response : '',
+    }));
+}
+
+export async function loadCoachingPlans(): Promise<CoachingPlan[]> {
+  const { data, error } = await supabase
+    .from('coaching_plans')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    status: r.status,
+    focus_area: r.focus_area,
+    goal: r.goal,
+    why_it_matters: r.why_it_matters,
+    action_steps: Array.isArray(r.action_steps) ? (r.action_steps as string[]) : [],
+    cadence_days: Number(r.cadence_days ?? 3),
+    next_follow_up_date: r.next_follow_up_date,
+    last_check_in_date: r.last_check_in_date ?? null,
+    follow_up_prompt: typeof r.follow_up_prompt === 'string' ? r.follow_up_prompt : '',
+    check_in_history: normalizeCheckIns(r.check_in_history),
+    source_metric: r.source_metric ?? null,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  }));
+}
+
+export async function saveCoachingPlan(plan: CoachingPlan): Promise<void> {
+  const { error } = await supabase.from('coaching_plans').upsert({
+    id: plan.id,
+    status: plan.status,
+    focus_area: plan.focus_area,
+    goal: plan.goal,
+    why_it_matters: plan.why_it_matters,
+    action_steps: plan.action_steps,
+    cadence_days: plan.cadence_days,
+    next_follow_up_date: plan.next_follow_up_date,
+    last_check_in_date: plan.last_check_in_date,
+    follow_up_prompt: plan.follow_up_prompt,
+    check_in_history: plan.check_in_history,
+    source_metric: plan.source_metric,
+    created_at: plan.created_at,
+    updated_at: plan.updated_at,
+  });
+  if (error) throw error;
+}
+
+export async function deleteCoachingPlan(id: string): Promise<void> {
+  const { error } = await supabase.from('coaching_plans').delete().eq('id', id);
+  if (error) throw error;
 }

@@ -349,7 +349,7 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
           return (
             <Grid size={{ xs: 12, sm: 3 }} key={p}>
               <StatCard title={PERIOD_LABELS[p]} interactive delay={i * 50}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}>
                   <ScoreRing score={s} grade={g} size={48} />
                 </Box>
               </StatCard>
@@ -358,7 +358,7 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: 'dashboar
         })}
         <Grid size={{ xs: 12, sm: 3 }}>
           <StatCard title="Overall" interactive delay={150}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}>
               <ScoreRing
                 score={overallScore}
                 grade={

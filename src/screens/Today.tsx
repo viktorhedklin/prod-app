@@ -18,19 +18,15 @@ import { makeEmptyEntry } from '../defaults';
 import { computeWeightedGrade, tierFromValue, aggregateEntries, formatTierLabel } from '../grading';
 import StatCard from '../components/StatCard';
 import TierChip from '../components/TierChip';
+import DateNav from '../components/DateNav';
 import type { DailyEntry } from '../types';
-import type { Tier } from '../types';
+import { todayLocal } from '../dateUtils';
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-const STEPPER_FIELDS: Array<{ key: keyof DailyEntry; label: string; min?: number; max?: number }> = [
-  { key: 'chats_handled', label: 'Chats Handled', min: 0 },
-  { key: 'emails_handled', label: 'Emails Handled', min: 0 },
-  { key: 'seek_feedback', label: 'Byseek Feedback Form', min: 0 },
+const STEPPER_FIELDS: Array<{ key: keyof DailyEntry; label: string; min?: number; max?: number; points?: string }> = [
+  { key: 'chats_handled', label: 'Chats Handled', min: 0, points: '×1' },
+  { key: 'emails_handled', label: 'Emails Handled', min: 0, points: '×1' },
   { key: 'tasks_handled', label: 'Tasks Handled', min: 0 },
-  { key: 'escalations_raised', label: 'Escalations Raised', min: 0 },
+  { key: 'internal_notes', label: 'Internal Notes', min: 0, points: '×0.5' },
 ];
 
 const PRECISE_FIELDS: Array<{
@@ -42,14 +38,13 @@ const PRECISE_FIELDS: Array<{
   placeholder?: string;
   adornment?: string;
 }> = [
-  { key: 'task_hours_logged', label: 'Task Hours Logged', min: 0, step: '0.5', adornment: 'h' },
-  { key: 'task_hours_submitted', label: 'Task Hours Submitted', min: 0, step: '0.5', adornment: 'h' },
   { key: 'escalation_accuracy_pct', label: 'Escalation Accuracy %', min: 0, max: 100, step: '0.1', placeholder: '0–100', adornment: '%' },
 ];
 
 function StepperRow({
   label,
   value,
+  points,
   onIncrement,
   onDecrement,
   min,
@@ -57,6 +52,7 @@ function StepperRow({
 }: {
   label: string;
   value: number;
+  points?: string;
   onIncrement: () => void;
   onDecrement: () => void;
   min?: number;
@@ -84,9 +80,14 @@ function StepperRow({
         '&:hover': { bgcolor: 'action.hover' },
       }}
     >
-      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-        {label}
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+          {label}
+        </Typography>
+        {points && (
+          <Chip label={points} size="small" sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'action.selected' }} />
+        )}
+      </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
         <IconButton
           size="small"
@@ -235,7 +236,7 @@ function CsatRatingInput({
   );
 }
 
-function LiveScoreRing({ score }: { score: number | null; grade?: Tier | null }) {
+function LiveScoreRing({ score }: { score: number | null }) {
   const pct = score !== null ? Math.min((score / 5) * 100, 100) : 0;
   const [displayPct, setDisplayPct] = useState(0);
 
@@ -272,15 +273,29 @@ function LiveScoreRing({ score }: { score: number | null; grade?: Tier | null })
   );
 }
 
+function productivityPoints(entry: DailyEntry): number {
+  return (
+    entry.chats_handled +
+    entry.emails_handled +
+    entry.task_hours_submitted * 10 +
+    entry.internal_notes * 0.5
+  );
+}
+
 export default function Today() {
   const { entries, targets, updateEntry, notify, qaEntries } = useApp();
-  const date = today();
+  const [date, setDate] = useState(todayLocal());
   const rawEntry = entries[date] ?? makeEmptyEntry(date);
-  const entry: DailyEntry = {
-    ...makeEmptyEntry(date),
-    ...rawEntry,
-    csat_ratings: Array.isArray(rawEntry.csat_ratings) ? rawEntry.csat_ratings : [],
-  };
+  const entry = useMemo<DailyEntry>(
+    () => ({
+      ...makeEmptyEntry(date),
+      ...rawEntry,
+      csat_ratings: Array.isArray(rawEntry.csat_ratings) ? rawEntry.csat_ratings : [],
+    }),
+    [date, rawEntry],
+  );
+
+  const datesWithData = useMemo(() => new Set(Object.keys(entries)), [entries]);
 
   const latestQa = useMemo(() => {
     const sorted = Object.values(qaEntries).sort((a, b) => b.week_start.localeCompare(a.week_start));
@@ -331,18 +346,20 @@ export default function Today() {
 
   const { score, grade } = useMemo(() => computeWeightedGrade([entry], targets, latestQa), [entry, targets, latestQa]);
 
+  const points = productivityPoints(entry);
+
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          {formatDate(date)}
-        </Typography>
-        {score !== null && grade !== null && (
+      <DateNav date={date} onChange={setDate} datesWithData={datesWithData} />
+
+      {score !== null && grade !== null && (
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            Today's score: <strong style={{ color: '#2952A3' }}>{score.toFixed(2)}</strong>
+            {date === todayLocal() ? "Today's" : 'Day'} score:{' '}
+            <strong style={{ color: '#2952A3' }}>{score.toFixed(2)}</strong>
           </Typography>
-        )}
-      </Box>
+        </Box>
+      )}
 
       <Box
         sx={{
@@ -379,31 +396,50 @@ export default function Today() {
           },
         }}
       >
-        <LiveScoreRing score={score} grade={grade} />
+        <LiveScoreRing score={score} />
         <Box sx={{ position: 'relative', zIndex: 1 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
             {score === null ? 'Start your score' : `You're tracking ${formatTierLabel(grade ?? 'PIP')}`}
           </Typography>
           <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.78)' }}>
-            Add volume, quality, and customer ratings to bring today to life.
+            Add volume, quality, and customer ratings to bring this day to life.
           </Typography>
         </Box>
       </Box>
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <StatCard title="Volume" interactive delay={50}>
+          <StatCard title="Productivity" interactive delay={50}>
             {STEPPER_FIELDS.map((f) => (
               <StepperRow
                 key={f.key}
                 label={f.label}
                 value={entry[f.key] as number}
+                points={f.points}
                 onIncrement={() => handleStep(f.key, 1, f.min, f.max)}
                 onDecrement={() => handleStep(f.key, -1, f.min, f.max)}
                 min={f.min}
                 max={f.max}
               />
             ))}
+            <Box
+              sx={{
+                mt: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                pt: 1,
+                borderTop: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                Task hours come from your shift todo list (×10 each, submitted only)
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                {points.toFixed(1)} pts
+              </Typography>
+            </Box>
           </StatCard>
         </Grid>
 
@@ -447,7 +483,7 @@ export default function Today() {
           </Box>
 
           <Box sx={{ mt: 2 }}>
-            <StatCard title="Today's Live Tiers" delay={200}>
+            <StatCard title="Day's Live Tiers" delay={200}>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {liveTiers.map((lt) => (
                   <Box key={lt.metric_key} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -468,9 +504,4 @@ export default function Today() {
       </Grid>
     </Box>
   );
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }

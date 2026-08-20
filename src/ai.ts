@@ -59,6 +59,7 @@ function buildDaySummary(entry: DailyEntry, targets: KPITarget[]): string {
   lines.push(`Tasks handled: ${entry.tasks_handled}`);
   lines.push(`Task hours logged: ${entry.task_hours_logged}h`);
   lines.push(`Task hours submitted: ${entry.task_hours_submitted}h`);
+  lines.push(`Internal notes: ${entry.internal_notes}`);
   lines.push(`Escalations raised: ${entry.escalations_raised}`);
   lines.push(`Escalation accuracy: ${entry.escalation_accuracy_pct ?? 'N/A'}%`);
   if (entry.csat_ratings.length > 0) {
@@ -296,17 +297,185 @@ export async function generateDailyFocus(
     return (rank[a.tier ?? 'PIP'] ?? 0) - (rank[b.tier ?? 'PIP'] ?? 0);
   })[0];
 
+  try {
+    const apiKey = loadAiApiKey();
+    if (apiKey) {
+      const recentSummary = recentEntries
+        .slice(-7)
+        .map((entry) => buildDaySummary(entry, targets))
+        .join('\n\n');
+      const response = await callOpenAI([
+        {
+          role: 'system',
+          content: 'You are a sharp but practical coaching assistant. Write one short daily focus sentence for the agent. It should name the main area to work on, reference the data, and end with a concrete next step. Return only plain text, no bullets, no preamble.',
+        },
+        {
+          role: 'user',
+          content: `Recent performance data:\n${recentSummary}\n\nWeakest metric: ${weakest.label} (${weakest.metric_key})\n\nWrite one focused sentence for today.`,
+        },
+      ], 0.5);
+      const cleaned = response.replace(/^\s*[-*]\s*/, '').trim();
+      if (cleaned) return cleaned;
+    }
+  } catch {
+    // fall back to rules
+  }
+
   const tips: Record<string, string> = {
     productivity: `Focus on ${weakest.label}: Try increasing your chat or email volume by 10% today. Set a pace goal for each hour.`,
     csat: `Focus on ${weakest.label}: Start each interaction by acknowledging the customer's concern before offering a solution. This single habit can lift CSAT significantly.`,
     qa: `Focus on ${weakest.label}: Double-check your responses against the QA rubric before sending. Review one past failed case to identify patterns.`,
     esc_rate: `Focus on ${weakest.label}: Try to resolve more issues before escalating. Confirm you've exhausted all available resources and knowledge base articles first.`,
     esc_accuracy: `Focus on ${weakest.label}: Before escalating, verify you're routing to the correct team and including all necessary context in your escalation notes.`,
-    quiz: `Focus on ${weakest.label}: Review your quiz materials for 15 minutes before your shift. Focus on the areas where you've lost points before.`,
-    punctuality: `Focus on ${weakest.label}: Set a reminder 10 minutes before your shift starts. Being on time consistently is the easiest metric to control.`,
   };
 
   return tips[weakest.metric_key] ?? `Focus on improving your ${weakest.label} today.`;
+}
+
+export interface CoachingPlanDraft {
+  focus_area: string;
+  goal: string;
+  why_it_matters: string;
+  action_steps: string[];
+  cadence_days: number;
+  follow_up_prompt: string;
+  source_metric: string | null;
+}
+
+export interface CoachingFollowUpResult {
+  coach_response: string;
+  next_follow_up_days: number;
+  status: 'active' | 'paused' | 'completed';
+}
+
+export async function generateCoachingPlan(
+  recentEntries: DailyEntry[],
+  targets: KPITarget[],
+  reflections: Record<string, Reflection>,
+  journal: JournalEntry[],
+): Promise<CoachingPlanDraft> {
+  const weakest = identifyWeakestMetrics(
+    recentEntries[recentEntries.length - 1] ?? ({ date: '', chats_handled: 0, emails_handled: 0, seek_feedback: 0, tasks_handled: 0, task_hours_logged: 0, task_hours_submitted: 0, internal_notes: 0, csat_ratings: [], escalations_raised: 0, escalation_accuracy_pct: null } as DailyEntry),
+    targets,
+  );
+  const weakestMetric = weakest[0] ?? null;
+  const recentSummary = recentEntries
+    .slice(-7)
+    .map((entry) => buildDaySummary(entry, targets))
+    .join('\n\n');
+  const reflectionCount = Object.keys(reflections).length;
+  const journalCount = journal.length;
+
+  try {
+    if (loadAiApiKey()) {
+      const response = await callOpenAI(
+        [
+          {
+            role: 'system',
+            content: 'You are a coaching planner for a support agent. Based on recent performance data, write a concrete improvement plan as JSON with fields focus_area, goal, why_it_matters, action_steps (3-4 short items), cadence_days (1-7), follow_up_prompt, and source_metric. Return only valid JSON.',
+          },
+          {
+            role: 'user',
+            content: `Recent performance data:\n${recentSummary || '(no data yet)'}\n\nWeakest metric: ${weakestMetric ? `${weakestMetric.label} (${weakestMetric.metric_key})` : 'none'}\nReflections completed: ${reflectionCount}\nJournal entries: ${journalCount}\n\nCreate a realistic coaching plan.`,
+          },
+        ],
+        0.4,
+      );
+
+      const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      if (
+        parsed &&
+        typeof parsed.focus_area === 'string' &&
+        typeof parsed.goal === 'string' &&
+        typeof parsed.why_it_matters === 'string' &&
+        Array.isArray(parsed.action_steps) &&
+        parsed.action_steps.every((step: unknown) => typeof step === 'string')
+      ) {
+        return {
+          focus_area: parsed.focus_area,
+          goal: parsed.goal,
+          why_it_matters: parsed.why_it_matters,
+          action_steps: parsed.action_steps.slice(0, 4),
+          cadence_days: Math.max(1, Math.min(7, Number(parsed.cadence_days) || 3)),
+          follow_up_prompt: typeof parsed.follow_up_prompt === 'string'
+            ? parsed.follow_up_prompt
+            : `How is your work going on ${parsed.focus_area}? What have you done so far, and what do you need from me?`,
+          source_metric: typeof parsed.source_metric === 'string' ? parsed.source_metric : weakestMetric?.metric_key ?? null,
+        };
+      }
+    }
+  } catch {
+    // fall back
+  }
+
+  const fallbackMetric = weakestMetric ?? {
+    label: 'Consistency',
+    metric_key: null,
+    tier: null,
+    value: 0,
+  };
+
+  return {
+    focus_area: fallbackMetric.label,
+    goal: `Raise ${fallbackMetric.label.toLowerCase()} with one focused habit over the next few shifts.`,
+    why_it_matters: `This is the clearest lever in your recent data, and tightening it should improve your overall score.`,
+    action_steps: [
+      'Pick one repeatable action before each shift.',
+      'Track what changed by the end of the shift.',
+      'Write down one blocker and one win each day.',
+    ],
+    cadence_days: 2,
+    follow_up_prompt: `How is ${fallbackMetric.label.toLowerCase()} going? What did you try, what worked, and where are you stuck?`,
+    source_metric: fallbackMetric.metric_key,
+  };
+}
+
+export async function generateCoachingFollowUp(
+  plan: CoachingPlanDraft,
+  recentEntries: DailyEntry[],
+  userResponse: string,
+): Promise<CoachingFollowUpResult> {
+  const recentSummary = recentEntries
+    .slice(-7)
+    .map((entry) => buildDaySummary(entry, [] as KPITarget[]))
+    .join('\n\n');
+
+  try {
+    if (loadAiApiKey()) {
+      const response = await callOpenAI(
+        [
+          {
+            role: 'system',
+            content: 'You are a practical coaching assistant. Read the current plan, recent performance, and the agent response. Return JSON with coach_response, next_follow_up_days, and status (active, paused, completed). Keep the tone direct and useful.',
+          },
+          {
+            role: 'user',
+            content: `Current coaching plan:\n${JSON.stringify(plan, null, 2)}\n\nRecent performance data:\n${recentSummary || '(no recent data)'}\n\nAgent response:\n${userResponse}\n\nReturn JSON only.`,
+          },
+        ],
+        0.5,
+      );
+
+      const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      if (typeof parsed.coach_response === 'string') {
+        return {
+          coach_response: parsed.coach_response,
+          next_follow_up_days: Math.max(1, Math.min(14, Number(parsed.next_follow_up_days) || plan.cadence_days)),
+          status: parsed.status === 'paused' || parsed.status === 'completed' ? parsed.status : 'active',
+        };
+      }
+    }
+  } catch {
+    // fall back
+  }
+
+  return {
+    coach_response: `Keep focusing on ${plan.focus_area.toLowerCase()}. Your next step is to finish the actions you set and tell me what changed.`,
+    next_follow_up_days: plan.cadence_days,
+    status: 'active',
+  };
 }
 
 export async function generateWeeklyRecap(

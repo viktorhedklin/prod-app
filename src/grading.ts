@@ -11,7 +11,7 @@ export const TIER_POINTS: Record<Tier, number> = {
 
 export function computeProductivityComposite(entries: DailyEntry[]): number {
   return entries.reduce(
-    (sum, e) => sum + e.chats_handled + e.emails_handled + e.seek_feedback * 0.5 + e.task_hours_submitted * 10,
+    (sum, e) => sum + e.chats_handled + e.emails_handled + e.task_hours_submitted * 10 + e.internal_notes * 0.5,
     0,
   );
 }
@@ -78,8 +78,6 @@ export function aggregateEntries(entries: DailyEntry[], qaPct: number | null = n
     qa: qaPct,
     esc_rate: escRate,
     esc_accuracy: escAccAvg,
-    quiz: 100,
-    punctuality: 10,
   };
 }
 

@@ -6,6 +6,7 @@ export interface DailyEntry {
   tasks_handled: number;
   task_hours_logged: number;
   task_hours_submitted: number;
+  internal_notes: number;
   csat_ratings: number[];
   escalations_raised: number;
   escalation_accuracy_pct: number | null;
@@ -16,6 +17,7 @@ export interface QaEntry {
   cases_reviewed: number;
   qa_percentage: number;
   notes: string | null;
+  categories: string[];
   created_at: string;
   updated_at: string;
 }
@@ -30,15 +32,41 @@ export interface CsatNote {
 
 export interface TaskItem {
   task_id: string;
+  source_task_id: string | null;
   brief_explanation: string;
   submit_to: string;
   amount: number | null;
   task_hours: number | null;
+  completion_date: string | null;
   status: 'pending' | 'submitted';
   created_at: string;
   submitted_at: string | null;
   linked_date: string;
   additional_info: string | null;
+}
+
+export interface CoachingCheckIn {
+  checked_at: string;
+  prompt: string;
+  user_response: string;
+  coach_response: string;
+}
+
+export interface CoachingPlan {
+  id: string;
+  status: 'active' | 'paused' | 'completed';
+  focus_area: string;
+  goal: string;
+  why_it_matters: string;
+  action_steps: string[];
+  cadence_days: number;
+  next_follow_up_date: string;
+  last_check_in_date: string | null;
+  follow_up_prompt: string;
+  check_in_history: CoachingCheckIn[];
+  source_metric: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface EscalationItem {

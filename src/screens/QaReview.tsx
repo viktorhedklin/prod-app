@@ -12,15 +12,37 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import IconButton from '@mui/material/IconButton';
+import Chip from '@mui/material/Chip';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from 'recharts';
 import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
 import TierChip from '../components/TierChip';
 import type { Tier } from '../types';
 
 const QA_TARGET = 93;
+
+const CATEGORY_OPTIONS = [
+  'Accuracy',
+  'Empathy',
+  'Grammar',
+  'Resolution',
+  'Compliance',
+  'Punctuality',
+  'Ownership',
+  'Communication',
+];
 
 function getWeekStart(date: Date): string {
   const d = new Date(date);
@@ -46,6 +68,23 @@ function qaGrade(pct: number): Tier {
   return 'PIP';
 }
 
+function computeQaStreak(sortedEntries: { week_start: string }[]): number {
+  if (sortedEntries.length === 0) return 0;
+  let streak = 0;
+  let cursor = new Date(getWeekStart(new Date()));
+  for (const entry of sortedEntries) {
+    const weekStart = new Date(entry.week_start + 'T00:00:00');
+    if (weekStart.getTime() === cursor.getTime()) {
+      streak++;
+      cursor = new Date(cursor);
+      cursor.setDate(cursor.getDate() - 7);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
 export default function QaReview() {
   const { qaEntries, upsertQaEntry, removeQaEntry } = useApp();
   const todayWeek = getWeekStart(new Date());
@@ -53,6 +92,7 @@ export default function QaReview() {
   const [cases, setCases] = useState('');
   const [pct, setPct] = useState('');
   const [notes, setNotes] = useState('');
+  const [categories, setCategories] = useState<string[]>([]);
 
   const sortedEntries = useMemo(
     () => Object.values(qaEntries).sort((a, b) => b.week_start.localeCompare(a.week_start)),
@@ -66,6 +106,8 @@ export default function QaReview() {
     ? sortedEntries.reduce((s, e) => s + e.qa_percentage, 0) / sortedEntries.length
     : 0;
 
+  const streak = useMemo(() => computeQaStreak(sortedEntries), [sortedEntries]);
+
   const trendData = useMemo(() => {
     if (sortedEntries.length < 2) return null;
     const recent = sortedEntries.slice(0, 4).reverse();
@@ -77,6 +119,29 @@ export default function QaReview() {
     return { diff: avgSecond - avgFirst, avgSecond, avgFirst };
   }, [sortedEntries]);
 
+  const chartData = useMemo(
+    () =>
+      sortedEntries
+        .slice()
+        .sort((a, b) => a.week_start.localeCompare(b.week_start))
+        .map((e) => ({
+          label: getWeekLabel(e.week_start),
+          pct: e.qa_percentage,
+          target: QA_TARGET,
+        })),
+    [sortedEntries],
+  );
+
+  const categoryFrequency = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const e of sortedEntries) {
+      for (const cat of e.categories ?? []) {
+        counts[cat] = (counts[cat] ?? 0) + 1;
+      }
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [sortedEntries]);
+
   const handleSubmit = () => {
     const casesNum = parseInt(cases, 10) || 0;
     const pctNum = parseFloat(pct) || 0;
@@ -86,10 +151,12 @@ export default function QaReview() {
       cases_reviewed: casesNum,
       qa_percentage: pctNum,
       notes: notes.trim() || null,
+      categories,
     });
     setCases('');
     setPct('');
     setNotes('');
+    setCategories([]);
   };
 
   const handleSelectWeek = (weekStart: string) => {
@@ -99,11 +166,19 @@ export default function QaReview() {
       setCases(String(e.cases_reviewed));
       setPct(String(e.qa_percentage));
       setNotes(e.notes ?? '');
+      setCategories(e.categories ?? []);
     } else {
       setCases('');
       setPct('');
       setNotes('');
+      setCategories([]);
     }
+  };
+
+  const toggleCategory = (cat: string) => {
+    setCategories((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+    );
   };
 
   return (
@@ -114,7 +189,7 @@ export default function QaReview() {
 
       {/* Summary cards */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid size={{ xs: 12, sm: 4 }}>
+        <Grid size={{ xs: 12, sm: 3 }}>
           <StatCard title="Latest QA Score">
             {latestEntry ? (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -133,7 +208,7 @@ export default function QaReview() {
             )}
           </StatCard>
         </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
+        <Grid size={{ xs: 12, sm: 3 }}>
           <StatCard title="Average QA Score">
             <Typography sx={{ fontSize: '2rem', fontWeight: 700, lineHeight: 1 }}>
               {sortedEntries.length > 0 ? avgPct.toFixed(1) : '—'}%
@@ -143,7 +218,7 @@ export default function QaReview() {
             </Typography>
           </StatCard>
         </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
+        <Grid size={{ xs: 12, sm: 3 }}>
           <StatCard title="Target">
             <Typography sx={{ fontSize: '2rem', fontWeight: 700, lineHeight: 1, color: 'primary.main' }}>
               {QA_TARGET}%
@@ -165,6 +240,24 @@ export default function QaReview() {
             )}
           </StatCard>
         </Grid>
+        <Grid size={{ xs: 12, sm: 3 }}>
+          <StatCard title="Weekly Streak">
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <LocalFireDepartmentIcon
+                sx={{
+                  fontSize: 26,
+                  color: streak > 0 ? 'warning.main' : 'text.disabled',
+                }}
+              />
+              <Typography sx={{ fontSize: '2rem', fontWeight: 700, lineHeight: 1 }}>
+                {streak}
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              week{streak === 1 ? '' : 's'} logged in a row
+            </Typography>
+          </StatCard>
+        </Grid>
       </Grid>
 
       {/* Trend insight */}
@@ -182,6 +275,52 @@ export default function QaReview() {
                 QA is {trendData.diff > 0 ? 'improving' : 'declining'} by{' '}
                 <strong>{Math.abs(trendData.diff).toFixed(1)}%</strong> over the last few weeks.
               </Typography>
+            </Box>
+          </StatCard>
+        </Box>
+      )}
+
+      {/* Trend chart */}
+      {chartData.length >= 2 && (
+        <Box sx={{ mb: 2 }}>
+          <StatCard title="QA Trend">
+            <Box sx={{ height: 200 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 4, right: 12, bottom: 0, left: -18 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E4E4E4" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6B6B6B' }} axisLine={{ stroke: '#E4E4E4' }} tickLine={false} />
+                  <YAxis domain={[70, 100]} tick={{ fontSize: 11, fill: '#6B6B6B' }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      border: '1px solid #E4E4E4',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      boxShadow: 'none',
+                    }}
+                    formatter={(v: unknown) => [typeof v === 'number' ? `${v.toFixed(1)}%` : '—', 'QA']}
+                  />
+                  <Line type="monotone" dataKey="pct" stroke="#2952A3" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls={false} />
+                  <Line type="monotone" dataKey="target" stroke="#4C8C6B" strokeWidth={1.5} strokeDasharray="5 4" dot={false} activeDot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </Box>
+          </StatCard>
+        </Box>
+      )}
+
+      {/* Category tags */}
+      {categoryFrequency.length > 0 && (
+        <Box sx={{ mb: 2 }}>
+          <StatCard title="Categories Mentioned">
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {categoryFrequency.map(([cat, count]) => (
+                <Chip
+                  key={cat}
+                  label={`${cat} (${count})`}
+                  size="small"
+                  sx={{ bgcolor: 'warning.light', color: 'warning.main', fontWeight: 600 }}
+                />
+              ))}
             </Box>
           </StatCard>
         </Box>
@@ -220,6 +359,25 @@ export default function QaReview() {
               sx={{ width: 300 }}
             />
           </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+            Categories to improve (optional)
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
+            {CATEGORY_OPTIONS.map((cat) => (
+              <Chip
+                key={cat}
+                label={cat}
+                size="small"
+                onClick={() => toggleCategory(cat)}
+                sx={{
+                  fontWeight: 500,
+                  bgcolor: categories.includes(cat) ? 'primary.main' : 'action.selected',
+                  color: categories.includes(cat) ? 'primary.contrastText' : 'text.secondary',
+                  '&:hover': { bgcolor: categories.includes(cat) ? 'primary.dark' : 'action.hover' },
+                }}
+              />
+            ))}
+          </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
               variant="contained"
@@ -238,6 +396,7 @@ export default function QaReview() {
                   setCases('');
                   setPct('');
                   setNotes('');
+                  setCategories([]);
                 }}
                 sx={{ color: 'error.main' }}
               >
@@ -259,6 +418,7 @@ export default function QaReview() {
                 <TableCell align="right">QA %</TableCell>
                 <TableCell align="center">Tier</TableCell>
                 <TableCell align="center">vs Target</TableCell>
+                <TableCell>Categories</TableCell>
                 <TableCell />
               </TableRow>
             </TableHead>
@@ -293,6 +453,18 @@ export default function QaReview() {
                       >
                         {vsTarget >= 0 ? '+' : ''}{vsTarget.toFixed(1)}%
                       </Typography>
+                    </TableCell>
+                    <TableCell>
+                      {(e.categories ?? []).length > 0 && (
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.25 }}>
+                          {e.categories.slice(0, 3).map((c) => (
+                            <Chip key={c} label={c} size="small" sx={{ height: 18, fontSize: '0.6rem' }} />
+                          ))}
+                          {e.categories.length > 3 && (
+                            <Chip label={`+${e.categories.length - 3}`} size="small" sx={{ height: 18, fontSize: '0.6rem' }} />
+                          )}
+                        </Box>
+                      )}
                     </TableCell>
                     <TableCell align="right">
                       <IconButton

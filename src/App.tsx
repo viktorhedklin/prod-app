@@ -14,8 +14,9 @@ import Escalations from './screens/Escalations';
 import Reflection from './screens/Reflection';
 import Growth from './screens/Growth';
 import QaReview from './screens/QaReview';
+import Coaching from './screens/Coaching';
 
-type Tab = 'dashboard' | 'today' | 'tasks' | 'escalations' | 'reflection' | 'growth' | 'qa';
+type Tab = 'dashboard' | 'today' | 'tasks' | 'escalations' | 'reflection' | 'growth' | 'qa' | 'coaching';
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -24,6 +25,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'escalations', label: 'Escalations' },
   { id: 'reflection', label: 'Reflect' },
   { id: 'qa', label: 'QA Review' },
+  { id: 'coaching', label: 'Coaching' },
   { id: 'growth', label: 'My Growth' },
 ];
 
@@ -47,6 +49,7 @@ function Nav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) 
     >
       <Typography
         sx={{
+          flexShrink: 0,
           fontWeight: 700,
           fontSize: '0.9375rem',
           color: 'text.primary',
@@ -62,6 +65,11 @@ function Nav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) 
           borderRadius: 2,
           p: 0.375,
           gap: 0.25,
+          minWidth: 0,
+          maxWidth: '100%',
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' },
         }}
       >
         {TABS.map((tab) => (
@@ -74,6 +82,8 @@ function Nav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) 
               px: { xs: 1.25, md: 2 },
               py: 0.5,
               minWidth: 0,
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
               fontSize: { xs: '0.75rem', md: '0.8125rem' },
               fontWeight: active === tab.id ? 600 : 400,
               bgcolor: active === tab.id ? 'background.paper' : 'transparent',
@@ -114,6 +124,7 @@ function App() {
               {activeTab === 'escalations' && <Escalations />}
               {activeTab === 'reflection' && <Reflection />}
               {activeTab === 'qa' && <QaReview />}
+              {activeTab === 'coaching' && <Coaching />}
               {activeTab === 'growth' && <Growth />}
             </Box>
           </Fade>
