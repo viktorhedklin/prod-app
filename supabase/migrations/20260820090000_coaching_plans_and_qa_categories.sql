@@ -54,6 +54,12 @@ CREATE POLICY "anon_crud_coaching_plans_del" ON coaching_plans FOR DELETE TO ano
 ALTER TABLE qa_entries
   ADD COLUMN IF NOT EXISTS categories jsonb NOT NULL DEFAULT '[]';
 
+-- The app is single-tenant with an anon key (auth.uid() is null), so the
+-- owner_id NOT NULL constraint from the original qa_entries migration would
+-- block inserts. Make it nullable.
+ALTER TABLE qa_entries ALTER COLUMN owner_id DROP NOT NULL;
+ALTER TABLE qa_entries ALTER COLUMN owner_id SET DEFAULT NULL;
+
 DROP POLICY IF EXISTS "anon_crud_qa_entries_sel" ON qa_entries;
 CREATE POLICY "anon_crud_qa_entries_sel" ON qa_entries FOR SELECT TO anon, authenticated USING (true);
 DROP POLICY IF EXISTS "anon_crud_qa_entries_ins" ON qa_entries;
