@@ -17,10 +17,10 @@ import {
 } from './grading';
 import type { DailyEntry, KPITarget, Thresholds } from './types';
 import { DEFAULT_KPI_TARGETS } from './defaults';
+import { todayLocal } from './dateUtils';
 
 function makeEntry(overrides: Partial<DailyEntry> = {}): DailyEntry {
-  const today = new Date();
-  const date = today.toISOString().split('T')[0];
+  const date = overrides.date ?? todayLocal();
   return {
     date,
     chats_handled: 0,
@@ -144,11 +144,12 @@ describe('grading utilities', () => {
   describe('computeRollingAverage', () => {
     it('returns 7 days with scores', () => {
       const entries: Record<string, DailyEntry> = {};
+      const base = todayLocal();
       for (let i = 6; i >= 0; i--) {
-        const d = new Date();
+        const d = new Date(base + 'T12:00:00');
         d.setDate(d.getDate() - i);
         const dateStr = d.toISOString().split('T')[0];
-        entries[dateStr] = makeEntry({ chats_handled: 10, emails_handled: 5, csat_ratings: [5] });
+        entries[dateStr] = makeEntry({ date: dateStr, chats_handled: 10, emails_handled: 5, csat_ratings: [5] });
       }
       const rolling = computeRollingAverage(entries, DEFAULT_KPI_TARGETS, 7, 95);
       expect(rolling.length).toBe(7);
@@ -196,8 +197,8 @@ describe('grading utilities', () => {
 
   describe('expandWeeklyEntries', () => {
     it('only spreads over past days', () => {
-      const today = new Date().toISOString().split('T')[0];
-      const yesterday = new Date();
+      const today = todayLocal();
+      const yesterday = new Date(today + 'T12:00:00');
       yesterday.setDate(yesterday.getDate() - 1);
       const ystr = yesterday.toISOString().split('T')[0];
       const weekStart = '2026-08-17';

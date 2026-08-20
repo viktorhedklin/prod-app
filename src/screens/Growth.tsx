@@ -28,6 +28,7 @@ import StatCard from '../components/StatCard';
 import PageHeader from '../components/PageHeader';
 import TierChip from '../components/TierChip';
 import CoachAvatar from '../components/CoachAvatar';
+import StreakCalendar from '../components/StreakCalendar';
 import { todayLocal } from '../dateUtils';
 import { loadAiApiKey, saveAiApiKey } from '../storage';
 import EmptyState from '../components/EmptyState';
@@ -466,6 +467,13 @@ export default function Growth() {
               )}
             </StatCard>
           </Box>
+        </Grid>
+
+        {/* Streak Calendar */}
+        <Grid size={{ xs: 12, md: 5 }}>
+          <StatCard title="Activity Streak" delay={100}>
+            <StreakCalendar reflections={reflections} moodCheckins={moodCheckins} entries={entries} months={12} />
+          </StatCard>
         </Grid>
 
         {/* Achievements + Recent Reflections */}
