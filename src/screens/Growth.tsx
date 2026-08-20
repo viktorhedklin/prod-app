@@ -6,7 +6,6 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
-import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -28,6 +27,7 @@ import { computeReflectionStreak } from '../insights';
 import StatCard from '../components/StatCard';
 import PageHeader from '../components/PageHeader';
 import TierChip from '../components/TierChip';
+import CoachAvatar from '../components/CoachAvatar';
 import { loadAiApiKey, saveAiApiKey } from '../storage';
 import type { JournalCategory, JournalEntry, KPITarget, Thresholds } from '../types';
 
@@ -567,9 +567,7 @@ function JournalBubble({ entry }: { entry: JournalEntry }) {
       </Box>
       {entry.ai_response && (
         <Box sx={{ alignSelf: 'flex-start', maxWidth: '80%', display: 'flex', gap: 1 }}>
-          <Avatar sx={{ width: 28, height: 28, bgcolor: 'success.main', fontSize: '0.75rem', flexShrink: 0 }}>
-            AI
-          </Avatar>
+          <CoachAvatar state="idle" size={28} />
           <Box>
             <Box
               sx={{

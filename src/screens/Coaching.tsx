@@ -281,6 +281,7 @@ export default function Coaching() {
         <CoachAvatar
           state={creating ? 'thinking' : Object.values(responding).some(Boolean) ? 'speaking' : 'idle'}
           size={64}
+          showStatus
         />
         <Box sx={{ flex: 1, minWidth: 220 }}>
           <Typography
