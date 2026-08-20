@@ -1,6 +1,6 @@
-import type { DailyEntry, KPITarget, JournalEntry, Reflection, Tier } from './types';
+import type { DailyEntry, KPITarget, JournalEntry, Reflection, Tier, CoachProfile } from './types';
 import { aggregateEntries, tierFromValue, formatTierLabel } from './grading';
-import { loadAiApiKey } from './storage';
+import { loadAiApiKey, loadCoachProfile } from './storage';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const MODEL = 'gpt-4o-mini';
@@ -8,6 +8,39 @@ const MODEL = 'gpt-4o-mini';
 interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+}
+
+const COACH_PERSONA = `You are a relentlessly supportive, high-standard performance coach. Your ONLY goal is to make this person successful in their role and build their long-term growth. You push them, encourage them, and keep them motivated. You celebrate real wins, call out patterns honestly, and never let them settle. Be warm but direct, concise, and concrete. When you don't know something about them yet, ask instead of guessing.`;
+
+function buildProfileBlock(profile: CoachProfile | null): string {
+  if (!profile) {
+    return `You are just getting to know this person. They have not completed an onboarding profile yet, so you know very little about them personally. Ask warm, specific questions to understand: their role and what success looks like for them, what they struggle with most, what stresses them out, what motivates them, and what kind of coaching works best for them (pushing hard vs gentle encouragement). Weave these questions naturally into your replies — don't interrogate.`;
+  }
+  const styleNote =
+    profile.coaching_style === 'push'
+      ? "This person wants to be pushed: challenge them, hold them to high standards, and do not go easy when they underperform."
+      : profile.coaching_style === 'encourage'
+        ? 'This person responds best to encouragement: build them up, affirm progress, and nudge forward gently.'
+        : 'Balance pushing and encouragement: affirm their effort, then hold them to high standards.';
+  return [
+    `This is the person's coaching profile — use it to personalize everything:`,
+    `- Role / what they do: ${profile.role || 'not specified'}`,
+    `- Their main goal right now: ${profile.main_goal || 'not specified'}`,
+    `- Their bigger ambition: ${profile.big_goal || 'not specified'}`,
+    `- Strengths: ${profile.strengths || 'not specified'}`,
+    `- What they struggle with: ${profile.struggles || 'not specified'}`,
+    `- Sources of stress: ${profile.stress_sources || 'not specified'}`,
+    `- What motivates them: ${profile.motivation || 'not specified'}`,
+    `- What demotivates or blocks them: ${profile.demotivators || 'not specified'}`,
+    `- Coaching style they asked for: ${styleNote}`,
+    profile.context ? `- Extra context they shared: ${profile.context}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function buildCoachContext(): string {
+  return buildProfileBlock(loadCoachProfile());
 }
 
 async function callOpenAI(messages: OpenAIMessage[], temperature: number = 0.7): Promise<string> {
@@ -124,7 +157,11 @@ export async function generateReflectionQuestions(
       ? weakest.map((w) => `${w.label} (tier ${formatTierLabel(w.tier)}, value ${w.value.toFixed(2)})`).join(', ')
       : 'All metrics performing well';
 
-  const systemPrompt = `You are an empathetic productivity coach for a customer support agent. Your job is to generate 4-6 thoughtful reflection questions that help them reflect on their workday. Tailor questions to their actual performance data. Ask about weak areas with curiosity, not judgment. Ask about strong areas to reinforce good habits. Keep questions concise, personal, and specific to their data. Return ONLY a JSON array of question strings, no other text.`;
+  const systemPrompt = `${COACH_PERSONA}
+
+${buildCoachContext()}
+
+You are generating 4-6 thoughtful reflection questions that help them reflect on their workday. Tailor questions to their actual performance data AND to their personal profile (struggles, stressors, goals). Ask about weak areas with curiosity, not judgment. Ask about strong areas to reinforce good habits. Include at least one question about their emotional state or stress. Keep questions concise, personal, and specific. Return ONLY a JSON array of question strings, no other text.`;
 
   const userPrompt = `Here is the agent's day summary:\n\n${daySummary}\n\nWeakest metrics: ${weakStr}\n\nGenerate 4-6 reflection questions. For weak metrics, ask what caused the low performance and what could improve it. For strong metrics, ask what they did well. Include at least one question about their emotional state or stress. Return a JSON array of strings.`;
 
@@ -177,8 +214,12 @@ export async function generateReflectionTips(
     .map((q, i) => `Q: ${q}\nA: ${answers[i] || '(no answer)'}`)
     .join('\n\n');
 
-  const systemPrompt = `You are a productivity coach for a customer support agent. Based on their day's data and their reflection answers, generate personalized, actionable tips to help them improve. Each tip should be specific and practical. Return a JSON object with this exact shape:
-{"tips": [{"metric": "metric name", "tip": "specific actionable advice", "priority": "high"|"medium"|"low"}], "summary": "a 2-3 sentence encouraging summary of their day"}
+  const systemPrompt = `${COACH_PERSONA}
+
+${buildCoachContext()}
+
+Based on their day's data and their reflection answers, generate personalized, actionable tips to help them improve. Each tip should be specific, practical, and reference both the data and what you know about them. Return a JSON object with this exact shape:
+{"tips": [{"metric": "metric name", "tip": "specific actionable advice", "priority": "high"|"medium"|"low"}], "summary": "a 2-3 sentence encouraging summary of their day that pushes them forward"}
 Generate 3-5 tips. Focus high priority tips on the weakest metrics. Return ONLY valid JSON, no other text.`;
 
   const userPrompt = `Day summary:\n${daySummary}\n\nOverall score: ${score?.toFixed(2) ?? 'N/A'}/5.00, Grade: ${grade ? formatTierLabel(grade) : 'N/A'}\n\nWeakest metrics: ${weakest.length > 0 ? weakest.map((w) => `${w.label} (${formatTierLabel(w.tier)})`).join(', ') : 'None'}\n\nReflection Q&A:\n${qaPairs}\n\nGenerate personalized tips and a summary. Return JSON.`;
@@ -231,7 +272,11 @@ export async function generateJournalResponse(
     performanceContext = buildDaySummary(lastEntry, targets);
   }
 
-  const systemPrompt = `You are a warm, empathetic personal growth coach for a customer support agent. They are sharing their thoughts, feelings, struggles, strengths, or concerns with you. Respond with genuine empathy, encouragement, and practical insight. If they mention something that connects to their performance data, make that connection. Keep responses concise (2-4 sentences) but meaningful. Ask a thoughtful follow-up question when appropriate. Return a JSON object with this exact shape: {"response": "your coaching response", "category": "stress|strength|weakness|win|concern|general"}. Return ONLY valid JSON.`;
+  const systemPrompt = `${COACH_PERSONA}
+
+${buildCoachContext()}
+
+The person is sharing their thoughts, feelings, struggles, strengths, or concerns with you. Respond with genuine empathy, encouragement, and practical insight. Push them toward their goals, connect what they say to their performance data and to their profile, and keep them motivated. If they're stressed, first acknowledge and validate, then give one concrete next step. Keep responses concise (2-4 sentences) but meaningful. Ask a thoughtful follow-up question when appropriate. Return a JSON object with this exact shape: {"response": "your coaching response", "category": "stress|strength|weakness|win|concern|general"}. Return ONLY valid JSON.`;
 
   const userPrompt = `Recent conversation context:\n${recentContext || '(start of conversation)'}\n\nRecent performance data:\n${performanceContext || '(no data yet)'}\n\nNew message from the agent:\n${userMessage}\n\nRespond as their coach. Return JSON with "response" and "category".`;
 
@@ -307,7 +352,11 @@ export async function generateDailyFocus(
       const response = await callOpenAI([
         {
           role: 'system',
-          content: 'You are a sharp but practical coaching assistant. Write one short daily focus sentence for the agent. It should name the main area to work on, reference the data, and end with a concrete next step. Return only plain text, no bullets, no preamble.',
+          content: `${COACH_PERSONA}
+
+${buildCoachContext()}
+
+Write ONE short, sharp daily focus sentence. It should name the main area to work on today, reference the data and what you know about them, and end with a concrete next step. Make it motivating and direct. Return only plain text, no bullets, no preamble.`,
         },
         {
           role: 'user',
@@ -372,11 +421,15 @@ export async function generateCoachingPlan(
         [
           {
             role: 'system',
-            content: 'You are a coaching planner for a support agent. Based on recent performance data, write a concrete improvement plan as JSON with fields focus_area, goal, why_it_matters, action_steps (3-4 short items), cadence_days (1-7), follow_up_prompt, and source_metric. Return only valid JSON.',
+            content: `${COACH_PERSONA}
+
+${buildCoachContext()}
+
+You are a coaching planner. Based on recent performance data AND the person's profile (goals, struggles, stressors, motivation), write a concrete, personalized improvement plan as JSON with fields focus_area, goal, why_it_matters, action_steps (3-4 short items), cadence_days (1-7), follow_up_prompt, and source_metric. The plan should push them toward their stated goals and address their real struggles. Return only valid JSON.`,
           },
           {
             role: 'user',
-            content: `Recent performance data:\n${recentSummary || '(no data yet)'}\n\nWeakest metric: ${weakestMetric ? `${weakestMetric.label} (${weakestMetric.metric_key})` : 'none'}\nReflections completed: ${reflectionCount}\nJournal entries: ${journalCount}\n\nCreate a realistic coaching plan.`,
+            content: `Recent performance data:\n${recentSummary || '(no data yet)'}\n\nWeakest metric: ${weakestMetric ? `${weakestMetric.label} (${weakestMetric.metric_key})` : 'none'}\nReflections completed: ${reflectionCount}\nJournal entries: ${journalCount}\n\nCreate a realistic, personalized coaching plan that pushes this person toward their goals.`,
           },
         ],
         0.4,
@@ -447,11 +500,15 @@ export async function generateCoachingFollowUp(
         [
           {
             role: 'system',
-            content: 'You are a practical coaching assistant. Read the current plan, recent performance, and the agent response. Return JSON with coach_response, next_follow_up_days, and status (active, paused, completed). Keep the tone direct and useful.',
+            content: `${COACH_PERSONA}
+
+${buildCoachContext()}
+
+Read the current plan, recent performance, and the person's response. Respond as their follow-up check-in: acknowledge what they've done, push them on gaps, reference their profile and data, and keep them motivated and accountable. Return JSON with coach_response, next_follow_up_days, and status (active, paused, completed). Keep the tone direct, warm, and useful.`,
           },
           {
             role: 'user',
-            content: `Current coaching plan:\n${JSON.stringify(plan, null, 2)}\n\nRecent performance data:\n${recentSummary || '(no recent data)'}\n\nAgent response:\n${userResponse}\n\nReturn JSON only.`,
+            content: `Current coaching plan:\n${JSON.stringify(plan, null, 2)}\n\nRecent performance data:\n${recentSummary || '(no recent data)'}\n\nPerson's response:\n${userResponse}\n\nReturn JSON only.`,
           },
         ],
         0.5,

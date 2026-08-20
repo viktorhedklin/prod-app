@@ -8,6 +8,12 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import TuneIcon from '@mui/icons-material/Tune';
 
 import IconButton from '@mui/material/IconButton';
 import SendIcon from '@mui/icons-material/Send';
@@ -22,7 +28,7 @@ import { computeReflectionStreak } from '../insights';
 import StatCard from '../components/StatCard';
 import TierChip from '../components/TierChip';
 import { loadAiApiKey, saveAiApiKey } from '../storage';
-import type { JournalCategory, JournalEntry } from '../types';
+import type { JournalCategory, JournalEntry, KPITarget, Thresholds } from '../types';
 
 const CATEGORY_COLORS: Record<JournalCategory, { bg: string; color: string }> = {
   stress: { bg: '#FBEAE8', color: '#C4554D' },
@@ -41,7 +47,7 @@ export default function Growth() {
   const {
     entries, targets, reflections, journal, achievements,
     insights, moodCheckins, addJournalEntry, updateJournalEntry,
-    dismissInsight, notify, refreshInsights,
+    dismissInsight, notify, refreshInsights, saveTargetsAndUpdate,
   } = useApp();
 
   const [showSettings, setShowSettings] = useState(false);
@@ -52,6 +58,9 @@ export default function Growth() {
   const [recapLoading, setRecapLoading] = useState(false);
   const [weeklyRecap, setWeeklyRecap] = useState<{ title: string; body: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const [showTargets, setShowTargets] = useState(false);
+  const [targetEdits, setTargetEdits] = useState<KPITarget[]>(targets);
 
   const entryList = useMemo(() => Object.values(entries).sort((a, b) => a.date.localeCompare(b.date)), [entries]);
   const reflectionList = useMemo(() => Object.values(reflections).sort((a, b) => b.entry_date.localeCompare(a.entry_date)), [reflections]);
@@ -74,6 +83,37 @@ export default function Growth() {
     saveAiApiKey(apiKey.trim());
     notify('API key saved', 'success');
     setShowSettings(false);
+  };
+
+  const openTargetEditor = () => {
+    setTargetEdits(targets);
+    setShowTargets(true);
+  };
+
+  const updateTargetEdit = (metricKey: string, patch: Partial<KPITarget>) => {
+    setTargetEdits((prev) =>
+      prev.map((t) => (t.metric_key === metricKey ? { ...t, ...patch } : t)),
+    );
+  };
+
+  const updateThreshold = (metricKey: string, tier: keyof Thresholds, value: string) => {
+    setTargetEdits((prev) =>
+      prev.map((t) =>
+        t.metric_key === metricKey
+          ? { ...t, thresholds: { ...t.thresholds, [tier]: parseFloat(value) || 0 } }
+          : t,
+      ),
+    );
+  };
+
+  const resetTargets = () => {
+    setTargetEdits(targets);
+  };
+
+  const saveTargetEdits = () => {
+    saveTargetsAndUpdate(targetEdits);
+    setShowTargets(false);
+    notify('KPI targets updated', 'success');
   };
 
   const handleSendJournal = async () => {
@@ -135,6 +175,81 @@ export default function Growth() {
         <IconButton onClick={() => setShowSettings(!showSettings)} size="small">
           <SettingsIcon fontSize="small" />
         </IconButton>
+      </Box>
+
+      {/* KPI Targets editor */}
+      <Box sx={{ mb: 2 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<TuneIcon />}
+          onClick={() => (showTargets ? setShowTargets(false) : openTargetEditor())}
+          sx={{ fontWeight: 600 }}
+        >
+          {showTargets ? 'Close Target Editor' : 'Adjust KPI Targets'}
+        </Button>
+        {showTargets && (
+          <Box sx={{ mt: 1 }}>
+            <StatCard title="KPI Targets & Thresholds">
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              Tune how each metric is weighted and what score earns each tier. Lower-is-better metrics (e.g. escalation rate) use the same thresholds as a cap.
+            </Typography>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Metric</TableCell>
+                  <TableCell align="right" sx={{ minWidth: 80 }}>Weight</TableCell>
+                  <TableCell align="center" sx={{ minWidth: 60 }}>S</TableCell>
+                  <TableCell align="center" sx={{ minWidth: 60 }}>A+</TableCell>
+                  <TableCell align="center" sx={{ minWidth: 60 }}>A</TableCell>
+                  <TableCell align="center" sx={{ minWidth: 60 }}>B</TableCell>
+                  <TableCell align="center" sx={{ minWidth: 60 }}>C</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {targetEdits.map((t) => (
+                  <TableRow key={t.metric_key}>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{t.label}</Typography>
+                      <Typography variant="caption" color="text.secondary">{t.metric_key}</Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TextField
+                        value={t.weight}
+                        type="number"
+                        size="small"
+                        slotProps={{ htmlInput: { min: 0, max: 1, step: 0.05 } }}
+                        onChange={(e) => updateTargetEdit(t.metric_key, { weight: parseFloat(e.target.value) || 0 })}
+                        sx={{ width: 90 }}
+                      />
+                    </TableCell>
+                    {(['S', 'A_plus', 'A', 'B', 'C'] as Array<keyof Thresholds>).map((tier) => (
+                      <TableCell align="center" key={tier}>
+                        <TextField
+                          value={t.thresholds[tier]}
+                          type="number"
+                          size="small"
+                          slotProps={{ htmlInput: { step: '0.1' } }}
+                          onChange={(e) => updateThreshold(t.metric_key, tier, e.target.value)}
+                          sx={{ width: 80 }}
+                        />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
+              <Button variant="contained" size="small" onClick={saveTargetEdits} sx={{ fontWeight: 600 }}>
+                Save Targets
+              </Button>
+              <Button variant="text" size="small" onClick={resetTargets} sx={{ color: 'text.secondary' }}>
+                Reset
+              </Button>
+            </Box>
+            </StatCard>
+          </Box>
+        )}
       </Box>
 
       {showSettings && (

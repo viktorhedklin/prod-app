@@ -16,6 +16,9 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import KeyIcon from '@mui/icons-material/Key';
+import WavingHandIcon from '@mui/icons-material/WavingHand';
+import EditIcon from '@mui/icons-material/Edit';
 import { useApp } from '../AppContext';
 import StatCard from '../components/StatCard';
 import {
@@ -24,7 +27,8 @@ import {
   type CoachingPlanDraft,
 } from '../ai';
 import { addDays, todayLocal } from '../dateUtils';
-import type { CoachingPlan } from '../types';
+import type { CoachingPlan, CoachProfile } from '../types';
+import { loadAiApiKey, saveAiApiKey, loadCoachProfile, saveCoachProfile } from '../storage';
 
 function daysUntil(dateKey: string | null | undefined): number | null {
   if (!dateKey) return null;
@@ -56,6 +60,15 @@ export default function Coaching() {
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [responding, setResponding] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+
+  const [profile, setProfile] = useState<CoachProfile | null>(() => loadCoachProfile());
+  const [editingProfile, setEditingProfile] = useState<CoachProfile | null>(null);
+  const [apiKey, setApiKey] = useState(() => loadAiApiKey());
+  const [showKey, setShowKey] = useState(false);
+
+  const hasProfile = !!profile && profile.onboarding_complete;
+  const needsProfile = !hasProfile;
+  const needsKey = !apiKey.trim();
 
   const entryList = useMemo(() => Object.values(entries).sort((a, b) => a.date.localeCompare(b.date)), [entries]);
   const sortedPlans = useMemo(
@@ -168,28 +181,165 @@ export default function Coaching() {
     notify(status === 'completed' ? 'Plan marked complete' : status === 'paused' ? 'Plan paused' : 'Plan resumed');
   };
 
+  const startOnboarding = () => {
+    setEditingProfile(
+      profile ?? {
+        role: '',
+        main_goal: '',
+        big_goal: '',
+        strengths: '',
+        struggles: '',
+        stress_sources: '',
+        motivation: '',
+        demotivators: '',
+        coaching_style: 'balanced',
+        context: '',
+        onboarding_complete: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    );
+  };
+
+  const saveProfile = () => {
+    if (!editingProfile) return;
+    const updated: CoachProfile = {
+      ...editingProfile,
+      onboarding_complete: true,
+      updated_at: new Date().toISOString(),
+    };
+    saveCoachProfile(updated);
+    setProfile(updated);
+    setEditingProfile(null);
+    notify(hasProfile ? 'Coach profile updated — I will coach to that from now on.' : "Thanks! Now I know you. I'll personalize every coaching plan and message to you.", 'success');
+  };
+
+  const saveKey = () => {
+    saveAiApiKey(apiKey);
+    setShowKey(false);
+    notify('AI provider key saved — coaching is live.', 'success');
+  };
+
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: 'auto' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
         <Typography variant="h6" sx={{ fontWeight: 600 }}>
           Coaching
         </Typography>
-        <Button
-          variant="contained"
-          size="small"
-          onClick={handleGenerate}
-          disabled={creating}
-          startIcon={creating ? <CircularProgress size={16} /> : <AddIcon />}
-          sx={{ fontWeight: 600 }}
-        >
-          {creating ? 'Analyzing...' : 'New Coaching Plan'}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {hasProfile && (
+            <Button size="small" variant="outlined" onClick={startOnboarding} startIcon={<EditIcon />} sx={{ fontWeight: 600 }}>
+              My Profile
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleGenerate}
+            disabled={creating}
+            startIcon={creating ? <CircularProgress size={16} /> : <AddIcon />}
+            sx={{ fontWeight: 600 }}
+          >
+            {creating ? 'Analyzing...' : 'New Coaching Plan'}
+          </Button>
+        </Box>
       </Box>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError(null)}>
           {error}
         </Alert>
+      )}
+
+      {needsKey && (
+        <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }} icon={<KeyIcon />} action={
+          <Button color="inherit" size="small" onClick={() => setShowKey(true)}>
+            {showKey ? 'Hide' : 'Add Key'}
+          </Button>
+        }>
+          Add your AI provider key to enable live coaching.
+        </Alert>
+      )}
+
+      {showKey && (
+        <Box sx={{ mb: 2 }}>
+          <StatCard title="AI Provider Key">
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              Paste your OpenAI-compatible API key. It's stored only in this browser and used to power your coach's responses, coaching plans, follow-ups, and insights.
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <TextField
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                type="password"
+                fullWidth
+                size="small"
+                placeholder="sk-..."
+              />
+              <Button variant="contained" onClick={saveKey} sx={{ flexShrink: 0 }} disabled={!apiKey.trim()}>
+                Save
+              </Button>
+            </Box>
+          </StatCard>
+        </Box>
+      )}
+
+      {editingProfile && (
+        <Box sx={{ mb: 2 }}>
+          <StatCard
+            title={hasProfile ? 'My Coaching Profile' : "Let's get to know each other"}
+            action={
+              hasProfile ? (
+                <IconButton size="small" onClick={() => setEditingProfile(null)} aria-label="Close">
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              ) : undefined
+            }
+          >
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              {hasProfile
+                ? 'Update anything and your coach will adapt.'
+                : "Answer whatever you can — even a few lines help me coach you properly. I'll use this to push, encourage, and motivate you toward real success."}
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+              <TextField label="Your role / what you do at work" value={editingProfile.role} onChange={(e) => setEditingProfile({ ...editingProfile, role: e.target.value })} fullWidth size="small" />
+              <TextField label="What does success look like for you right now?" value={editingProfile.main_goal} onChange={(e) => setEditingProfile({ ...editingProfile, main_goal: e.target.value })} fullWidth size="small" />
+              <TextField label="Your bigger ambition (months ahead)" value={editingProfile.big_goal} onChange={(e) => setEditingProfile({ ...editingProfile, big_goal: e.target.value })} fullWidth size="small" />
+              <TextField label="Your strengths — what you're naturally good at" value={editingProfile.strengths} onChange={(e) => setEditingProfile({ ...editingProfile, strengths: e.target.value })} fullWidth size="small" />
+              <TextField label="What you struggle with most" value={editingProfile.struggles} onChange={(e) => setEditingProfile({ ...editingProfile, struggles: e.target.value })} fullWidth size="small" />
+              <TextField label="What stresses you out at work" value={editingProfile.stress_sources} onChange={(e) => setEditingProfile({ ...editingProfile, stress_sources: e.target.value })} fullWidth size="small" />
+              <TextField label="What motivates you" value={editingProfile.motivation} onChange={(e) => setEditingProfile({ ...editingProfile, motivation: e.target.value })} fullWidth size="small" />
+              <TextField label="What demotivates or blocks you" value={editingProfile.demotivators} onChange={(e) => setEditingProfile({ ...editingProfile, demotivators: e.target.value })} fullWidth size="small" />
+              <TextField select label="How do you like to be coached?" value={editingProfile.coaching_style} onChange={(e) => setEditingProfile({ ...editingProfile, coaching_style: e.target.value as CoachProfile['coaching_style'] })} size="small" sx={{ maxWidth: 300 }}>
+                <MenuItem value="push">Push me hard — don't let me coast</MenuItem>
+                <MenuItem value="encourage">Encourage me gently</MenuItem>
+                <MenuItem value="balanced">Balance both</MenuItem>
+              </TextField>
+              <TextField label="Anything else you want me to know about you?" value={editingProfile.context} onChange={(e) => setEditingProfile({ ...editingProfile, context: e.target.value })} fullWidth size="small" multiline minRows={2} />
+            </Box>
+            <Button variant="contained" onClick={saveProfile} sx={{ mt: 1.5 }} startIcon={<WavingHandIcon />}>
+              {hasProfile ? 'Save Profile' : 'Start Coaching'}
+            </Button>
+          </StatCard>
+        </Box>
+      )}
+
+      {needsProfile && !editingProfile && (
+        <Box sx={{ mb: 2 }}>
+          <StatCard title="Your coach wants to know you">
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+              <WavingHandIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+              <Box sx={{ flex: 1, minWidth: 220 }}>
+                <Typography variant="body2" color="text.secondary">
+                  To coach you properly I need to understand your role, your struggles, what stresses you, what drives you, and how you like to be coached. It only takes a couple of minutes.
+                </Typography>
+              </Box>
+              <Button variant="contained" onClick={startOnboarding} sx={{ fontWeight: 600 }}>
+                Get to Know Me
+              </Button>
+            </Box>
+          </StatCard>
+        </Box>
       )}
 
       {duePlans.length > 0 && (

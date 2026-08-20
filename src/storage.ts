@@ -12,6 +12,7 @@ import type {
   Achievement,
   QaEntry,
   CoachingPlan,
+  CoachProfile,
 } from './types';
 import { DEFAULT_KPI_TARGETS, makeEmptyEntry } from './defaults';
 
@@ -377,6 +378,36 @@ export function loadAiApiKey(): string {
 export function saveAiApiKey(key: string): void {
   try {
     localStorage.setItem('pg_ai_api_key', key);
+  } catch {
+    // non-fatal
+  }
+}
+
+// --- Coach Profile (stays in localStorage — personal coaching context) ---
+
+export function loadCoachProfile(): CoachProfile | null {
+  try {
+    const raw = localStorage.getItem('pg_coach_profile');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CoachProfile;
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function saveCoachProfile(profile: CoachProfile): void {
+  try {
+    localStorage.setItem('pg_coach_profile', JSON.stringify(profile));
+  } catch {
+    // non-fatal
+  }
+}
+
+export function clearCoachProfile(): void {
+  try {
+    localStorage.removeItem('pg_coach_profile');
   } catch {
     // non-fatal
   }

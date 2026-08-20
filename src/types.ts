@@ -69,6 +69,22 @@ export interface CoachingPlan {
   updated_at: string;
 }
 
+export interface CoachProfile {
+  role: string;
+  main_goal: string;
+  big_goal: string;
+  strengths: string;
+  struggles: string;
+  stress_sources: string;
+  motivation: string;
+  demotivators: string;
+  coaching_style: 'push' | 'encourage' | 'balanced';
+  context: string;
+  onboarding_complete: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface EscalationItem {
   escalation_id: string;
   case_number: string;
