@@ -1,0 +1,1 @@
+import{$ as e,at as t}from"./useApp-DQk0ISIE.js";import{t as n}from"./getThemeProps-C0sZjj6g.js";var r=e();function i({props:e,name:r,defaultTheme:i,themeId:a}){let o=t(i);return a&&(o=o[a]||o),n({theme:o,name:r,props:e})}export{r as n,i as t};
