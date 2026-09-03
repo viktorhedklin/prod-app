@@ -1,0 +1,320 @@
+export interface KnowledgeEntry {
+  id: string;               // short slug like 'eu-card-fees'
+  category: 'accounts' | 'trading' | 'card' | 'earn' | 'legal' | 'announcements' | 'global' | 'comparisons';
+  title: string;            // human title
+  keywords: string[];       // lowercase search keywords customers might use
+  content: string;          // the distilled facts, compact, written for an AI support copilot to answer customers. Keep numbers/limits/fees EXACT.
+  sources?: string[];       // URLs from the research file if present
+}
+
+export const BYBIT_KNOWLEDGE: KnowledgeEntry[] = [
+  {
+    id: 'eu-account-registration-eligibility',
+    category: 'accounts',
+    title: 'Bybit EU Account Registration, Eligibility & Account Types',
+    keywords: ['register', 'account creation', 'eea residency', 'eligibility', 'subaccount', 'funding account', 'unified trading account', 'uta'],
+    content: 'Registration on bybit.eu is restricted strictly to residents of supported European Economic Area (EEA) countries. Users register via email or mobile phone with mandatory SMS and Email verification codes. Account hierarchy consists of four primary modules: Main Account (controls security settings, API keys, subaccount management), Funding Account (primary storage for fiat and newly deposited/purchased crypto assets, used for fiat funding, withdrawals, and Bybit Card spending), Unified Trading Account (UTA - consolidates Spot and Spot Margin trading and balances), and Bybit Earn Account (holds assets in yield and staking products). Non-EEA residents and citizens of restricted jurisdictions (US, Mainland China, etc.) are excluded.',
+    sources: ['https://www.bybit.eu/en-EU/help-center/article/How-to-register-an-account']
+  },
+  {
+    id: 'eu-account-security-2fa',
+    category: 'accounts',
+    title: 'Bybit EU Account Security, 2FA Setup & Verification Checks',
+    keywords: ['security', '2fa', 'google authenticator', 'sms code', 'anti-phishing', 'authenticity check', 'hide my email', 'reset 2fa'],
+    content: 'Bybit EU mandates Two-Factor Authentication (2FA) for crypto withdrawals, API creation, and sensitive settings. Supported 2FA controls include Google Authenticator (TOTP), SMS, and Email verification codes. Users can set a custom Anti-Phishing Code displayed on all official Bybit emails to prevent phishing attacks. Customers must verify official Bybit domain URLs, emails, or social media accounts using the Bybit EU Authenticity Check tool at https://www.bybit.eu/en-EU/help-center/. If Google Authenticator is lost, users must undergo a identity verification 2FA reset; for account security, crypto withdrawals are locked for 24 hours following a 2FA reset. Users logging in with Apple Hide My Email must note their system-generated relay address.',
+    sources: [
+      'https://www.bybit.eu/en-EU/help-center/article/How-to-Enhance-Your-Account-Security',
+      'https://www.bybit.eu/en-EU/help-center/article/How-to-Bind-Your-Account-2FA-via-Google-Authenticator'
+    ]
+  },
+  {
+    id: 'eu-account-deactivation-deletion',
+    category: 'accounts',
+    title: 'Bybit EU Account Deactivation, Self-Deletion & Data Retention',
+    keywords: ['delete account', 'deactivate account', 'close account', 'data retention', 'gdpr deletion', 'dust balance', 'account cancellation'],
+    content: 'Users can temporarily freeze (deactivate) or permanently delete their Bybit EU account self-service via Account & Security settings. Permanent deletion is irreversible. Mandatory prerequisites before deletion include: zero account balance (transfer funds out or sweep dust via Convert Small Balance), zero open orders/positions, zero active subaccounts, and no pending withdrawals or Bybit Card processing. Under EU AML5/6 regulations, Austrian Commercial Code (UGB), and Federal Fiscal Code (BAO), Bybit EU retains user identity verification files, transaction records, and compliance logs for 7 to 10 years following account closure, overriding GDPR erasure requests for statutory audit compliance.',
+    sources: ['https://www.bybit.eu/en-EU/help-center/topic-list/terms-of-services']
+  },
+  {
+    id: 'eu-kyc-verification-levels',
+    category: 'accounts',
+    title: 'Bybit EU Identity Verification (KYC) Tiers and Limits',
+    keywords: ['kyc', 'verification levels', 'standard kyc', 'advanced kyc', 'pro kyc', 'poi', 'poa', 'deposit limit', 'sepa limit'],
+    content: 'Bybit EU enforces mandatory KYC verification before any deposit, trade, or withdrawal under MiCAR regulations. Verification tiers: 1) Standard Verification (Compulsory): Requires Proof of Identity (POI), Selfie Liveness check, and a 7-question Profile Survey. Unlocks €10,000,000 per order SEPA deposit/withdrawal limits, standard fiat limits (VIP 0: <= €250,000/order, <= €500,000 daily), and card usage. 2) Advanced Verification (Optional): Requires Standard KYC plus valid Proof of Address (POA) dated within 90 days. Unlocks higher daily fiat limits (VIP 0: <= €1,000,000 daily). 3) Pro Verification: Requires Standard & Advanced KYC plus Enhanced Due Diligence (EDD) / Proof of Wealth for institutional limits.',
+    sources: [
+      'https://www.bybit.eu/en-EU/help-center/article/How-to-Complete-Individual-KYC-Verification',
+      'https://www.bybit.eu/en-EU/help-center/article/Benefits-of-Different-KYC-Levels',
+      'https://www.bybit.eu/en-EU/help-center/article/Individual-KYC-FAQ'
+    ]
+  },
+  {
+    id: 'eu-kyc-documents-troubleshooting',
+    category: 'accounts',
+    title: 'Bybit EU Accepted KYC Documents, Rejection Reasons & Fixes',
+    keywords: ['kyc rejection', 'proof of address', 'proof of identity', 'passport', 'id card', 'kyc processing', 'utility bill', 'kyc failed'],
+    content: 'Accepted Proof of Identity (POI) documents: original government-issued Passports (must show photo and signature page), National ID Cards, or EEA Residence Permits. POI must be unexpired with clear corners and no glare. Accepted Proof of Address (POA) documents: bank statements, utility bills (electricity, water, gas, internet), or municipal tax letters issued within the trailing 90 days showing user full name and residential address. Mobile phone bills, credit card statements, and tenancy agreements are unaccepted. Resubmission limit: maximum of 5 failed submissions in a 24-hour window (locks user for 24 hours). Common rejection causes: cropped document edges, name mismatch with bank account, or attempt to verify multiple accounts (strictly 1 verified account per person).',
+    sources: ['https://www.bybit.eu/en-EU/help-center/article/Common-Reasons-and-Solutions-for-KYC-Verification-Failures']
+  },
+  {
+    id: 'eu-fiat-deposits-withdrawals',
+    category: 'accounts',
+    title: 'Bybit EU Fiat Deposits and Withdrawals (SEPA & Local Gateways)',
+    keywords: ['sepa deposit', 'sepa instant', 'fiat deposit', 'fiat withdrawal', 'bank transfer', 'eur deposit', 'credit card deposit', 'ideal', 'blik'],
+    content: 'Bybit EU supports EUR fiat funding via direct SEPA and SEPA Instant bank transfers. SEPA deposit fee is €0 (zero fee) with a maximum limit of €10,000,000 per order for all verified tiers. Bank transfers must originate from a personal account matching the exact verified full name on Bybit EU (third-party deposits are rejected and returned at sender cost). Fiat card deposits (Visa/Mastercard) allow linking up to 5 payment cards per trailing 180 days. Supported local payment methods: iDEAL (0% fee), BLIK (0.9% + 0.5 PLN), ZEN.com (0.92%), Trustly (€1.32 fixed fee), and PayPal (1.75% buy / 1.6% sell fee). Fiat withdrawal processing fees are displayed on the withdrawal interface.',
+    sources: [
+      'https://www.bybit.eu/en-EU/help-center/article/FAQ-Fiat-Deposit',
+      'https://www.bybit.eu/en-EU/help-center/article/FAQ-Fiat-Withdrawal',
+      'https://www.bybit.eu/en-EU/help-center/article/How-to-Withdraw-Fiat-Currencies-on-Bybit'
+    ]
+  },
+  {
+    id: 'eu-crypto-deposits-withdrawals',
+    category: 'accounts',
+    title: 'Bybit EU Crypto On-Chain Deposits, Internal Transfers & Travel Rule',
+    keywords: ['crypto deposit', 'crypto withdrawal', 'internal transfer', 'travel rule', 'network fee', 'on-chain withdrawal', 'uid transfer'],
+    content: 'On-chain crypto deposits to Bybit EU carry €0 platform fee. Internal transfers between Bybit EU accounts (via user UID, registered email, or mobile number) are 100% free (€0 fee) and instant. On-chain crypto withdrawals incur a fixed network transaction fee based on the selected coin and blockchain network (e.g., 1 USDT for TRC-20, fixed BTC rate on Bitcoin network). Under the EU Transfer of Funds Regulation (Travel Rule), outgoing and incoming crypto transfers above applicable regulatory thresholds require full Originator and Beneficiary counterparty details (VASP name, recipient name, wallet ownership declaration) before funds are credited or dispatched.',
+    sources: [
+      'https://www.bybit.eu/en-EU/help-center/article/FAQ-Crypto-Withdrawal',
+      'https://www.bybit.eu/en-EU/help-center/article/FAQ-Travel-Rule'
+    ]
+  },
+  {
+    id: 'eu-spot-trading-mechanics',
+    category: 'trading',
+    title: 'Bybit EU Spot Trading Order Types, Interface & Execution Rules',
+    keywords: ['spot trading', 'limit order', 'market order', 'conditional order', 'take profit', 'stop loss', 'post only', 'ioc', 'fok', 'iceberg order'],
+    content: 'Bybit EU Spot Trading provides order-book execution for EUR fiat pairs and major crypto assets. Available order types: Market Order (executed instantly at best available price), Limit Order (placed at specified price), Conditional Order (triggered when benchmark index/last price hits trigger), Take Profit / Stop Loss (TP/SL attached to spot orders), and Time-In-Force options: Good-Till-Canceled (GTC), Immediate-Or-Cancel (IOC), Fill-Or-Kill (FOK), Post-Only (guarantees maker execution), and Iceberg Orders (masks total quantity). Interface consists of Market Header, TradingView Chart, Order Book, Order Entry panel, and Order Management panel.',
+    sources: [
+      'https://www.bybit.eu/en-EU/help-center/article/Types-of-Orders-Available-on-Bybit',
+      'https://www.bybit.eu/en-EU/help-center/article/How-to-Get-Started-with-Spot-Trading',
+      'https://www.bybit.eu/en-EU/help-center/article/Bybit-Spot-Trading-Rules'
+    ]
+  },
+  {
+    id: 'eu-one-click-buy-sell',
+    category: 'trading',
+    title: 'Bybit EU One-Click Buy and Sell Features, Channels & Limits',
+    keywords: ['one-click buy', 'buy crypto card', 'one click sell', 'paypal crypto', 'ideal crypto', 'blik buy', 'zen.com', 'trustly'],
+    content: 'One-Click Buy & Sell enables instant purchase or sale of crypto assets using EUR and local fiat channels. Processing fees by payment method: iDEAL (0% free), PayPal (Buy: 1.75% EUR / 2.5% DKK/SEK/NOK/CHF/HUF/CZK; Sell: 1.60% capped at 10 EUR / 75 DKK / 115 SEK / 120 NOK / 10 CHF / 4000 HUF / 250 CZK), BLIK (0.9% + 0.5 PLN), ZEN.com (0.92%), Trustly (€1.32 / 10 DKK / 14.5 SEK flat fee), and Bank Cards (channel fee displayed at checkout). Standard KYC limits for One-Click Buy (VIP 0): <= €250,000 per order, <= €500,000 daily, <= €2,500,000 weekly, <= €8,000,000 monthly. Advanced KYC scales limits up to €2,000,000 per order / €4,000,000 daily.',
+    sources: [
+      'https://www.bybit.eu/en-EU/help-center/article/How-to-Buy-Coins-With-One-Click-Buy',
+      'https://www.bybit.eu/en-EU/help-center/article/FAQ-One-Click-Buy',
+      'https://www.bybit.eu/en-EU/help-center/article/How-to-Sell-Coins-With-One-Click-Buy'
+    ]
+  },
+  {
+    id: 'eu-convert-and-dust',
+    category: 'trading',
+    title: 'Bybit EU Asset Convert & Convert Small Balance (Dust Conversion)',
+    keywords: ['convert', 'crypto convert', 'dust conversion', 'convert small balance', 'small balance fee', 'zero fee convert', 'dust limits'],
+    content: 'Bybit EU Convert enables instant zero-fee crypto-to-crypto conversion between supported assets with real-time price quotes in Market or Limit execution modes. Convert Small Account Balance (Dust Conversion) enables sweeping small remaining crypto balances (value below minimum spot order size) into EUR or major stablecoins. Convert Small Balance incurs a fixed 2% conversion fee charged by Bybit EU and can be executed strictly once every 1 hour. Assets undergoing wallet maintenance, delisted assets, or balances exceeding individual dust thresholds are ineligible.',
+    sources: [
+      'https://www.bybit.eu/en-EU/help-center/article/How-to-convert-your-assets',
+      'https://www.bybit.eu/en-EU/help-center/article/How-to-Convert-Small-Account-Balance'
+    ]
+  },
+  {
+    id: 'eu-dca-trading-bots',
+    category: 'trading',
+    title: 'Bybit EU Dollar-Cost Averaging (DCA) Trading Bots',
+    keywords: ['dca bot', 'dollar cost averaging', 'automated trading', 'dca plan', 'bot fees', 'dca parameters', 'crypto bot'],
+    content: 'DCA Trading Bots on Bybit EU automate recurring purchases of crypto assets at fixed time intervals (e.g., hourly, daily, weekly) to average entry prices. Setup parameters require selecting up to 5 crypto assets per bot, investment currency (EUR, USDC, USDT), investment amount per frequency interval, and optional max investment cap. DCA bot purchases incur standard Bybit EU Spot trading fees (Maker/Taker) with zero additional bot management fee. Funds are drawn from the Funding Account or UTA. If account balance is insufficient at scheduled execution, purchase is skipped; 3 consecutive failures auto-pause the bot.',
+    sources: [
+      'https://www.bybit.eu/en-EU/help-center/article/Introduction-to-DCA-Bots',
+      'https://www.bybit.eu/en-EU/help-center/article/FAQ-DCA-Bot'
+    ]
+  },
+  {
+    id: 'eu-recurring-buy-auto-invest',
+    category: 'trading',
+    title: 'Bybit EU Recurring Buy and Auto-Invest Features',
+    keywords: ['recurring buy', 'auto invest', 'auto purchase', 'recurring investment', 'cancel recurring buy'],
+    content: 'Recurring Buy / Auto-Invest enables automated scheduled purchases of specific cryptocurrencies using linked payment channels or fiat balances (e.g., weekly or monthly EUR purchases). Users configure target asset, fiat currency, frequency schedule, and payment source. Auto-termination logic: a recurring buy plan automatically cancels if automated execution fails 3 consecutive times due to insufficient funds, card decline, or asset delisting. Plans can be paused, modified, or canceled anytime without penalty via the Auto-Invest dashboard.',
+    sources: [
+      'https://www.bybit.eu/en-EU/help-center/article/FAQ-Auto-Invest',
+      'https://www.bybit.eu/en-EU/help-center/article/How-to-Get-Started-with-Auto-Invest'
+    ]
+  },
+  {
+    id: 'eu-spot-fee-schedule',
+    category: 'trading',
+    title: 'Bybit EU Tiered Spot Trading Fee Schedule & Rates',
+    keywords: ['trading fees', 'spot fee schedule', 'maker fee', 'taker fee', 'vip fee tiers', 'usdc eur fee', 'fiat pair fee', 'bybit eu fees'],
+    content: 'Bybit EU applies a tiered maker-taker fee schedule based on 30-day EUR volume or EUR asset balance. Standard non-VIP (VIP 0) rates: Crypto-Crypto Pairs: 0.1000% Maker / 0.2500% Taker; Fiat-Crypto Pairs (e.g. USDC/EUR): 0.1500% Maker / 0.2500% Taker. VIP Tiers: VIP 1 (>= €100k balance / €1M vol): 0.0675% Maker / 0.1000% Taker (crypto) / 0.1200% Taker (fiat); VIP 2 (>= €250k / €5M): 0.0650% Maker / 0.0775% Taker; VIP 3 (>= €500k / €10M): 0.0625% Maker / 0.0750% Taker; VIP 4 (>= €1M / €25M): 0.0500% Maker / 0.0600% Taker; VIP 5 (>= €2M / €50M): 0.0400% Maker / 0.0500% Taker; Supreme VIP (>= €100M vol): 0.0300% Maker / 0.0450% Taker. Effective October 5, 2026 at 11:00 UTC, Bybit EU updates to a unified single fee rate structure.',
+    sources: [
+      'https://www.bybit.eu/en-EU/help-center/article/Trading-Fee-Structure',
+      'https://www.bybit.eu/en-EU/help-center/article/Introduction-to-Bybit-VIP-Program'
+    ]
+  },
+  {
+    id: 'eu-card-overview-eligibility',
+    category: 'card',
+    title: 'Bybit EU Card Overview, Eligibility & Application Guide',
+    keywords: ['bybit card', 'apply for card', 'virtual card', 'physical card', 'card eligibility', 'virtual card lite', 'card delivery', 'card shipping'],
+    content: 'The Bybit EU Card is a EUR-denominated Visa/Mastercard debit card available strictly to EEA residents who have completed mandatory Standard KYC. Application pathways: 1) Virtual Card Lite: Instant issuance upon simplified eligibility check, capped at €150 lifetime spending limit. 2) Standard Virtual Card: Instant issuance upon full Standard KYC verification, unlocking tier spending limits. 3) Physical Card: Requested via Card Dashboard after virtual card issuance; physical card shipping is free (0 EUR first issuance) and delivered via standard post within 7-15 business days across EEA countries.',
+    sources: ['https://www.bybit.eu/en-EU/help-center/article/Fees-and-Spending-Limits-Bybit-Card']
+  },
+  {
+    id: 'eu-card-activation-pin',
+    category: 'card',
+    title: 'Bybit EU Card Activation and Mandatory PIN Initialization',
+    keywords: ['activate card', 'card pin', 'pin initialization', 'activate physical card', 'cvv activation', 'card dashboard'],
+    content: 'Virtual Bybit Cards are automatically activated upon approval on the dashboard. Physical Bybit Cards must be manually activated upon arrival by navigating to Card Dashboard -> Manage My Card -> Activate, and entering the 3-digit CVV code from the back of the physical card. Mandatory Post-Activation PIN Rule: Before making any contactless in-store payment or online transaction, the physical card PIN must be initialized by completing a transaction at a physical ATM (e.g., balance inquiry or cash withdrawal) or a Chip & PIN merchant terminal. Contactless transactions will be declined until PIN initialization is completed.',
+    sources: ['https://www.bybit.eu/en-EU/help-center/article/Fees-and-Spending-Limits-Bybit-Card']
+  },
+  {
+    id: 'eu-card-fees-and-limits',
+    category: 'card',
+    title: 'Bybit EU Card Fee Schedule and Tier Spending / ATM Limits',
+    keywords: ['card fees', 'card limits', 'atm fee', 'atm withdrawal limit', 'fx fee', 'crypto conversion fee', 'physical card replacement', 'spending limit'],
+    content: 'Bybit EU Card Fee Schedule: Virtual & Physical issuance: €0; Annual fee: €0; Inactivity fee: €0; Card cancellation: €0; Physical replacement fee: €5 (for lost or damaged card). Foreign Exchange (FX) Fee: 0.5% added on top of Mastercard reference rate for non-EUR transactions. Crypto Conversion Fee: 0.9% added on top of One-Click Sell exchange rate when spending crypto directly. ATM Withdrawal Fee: 0% on first €100 cumulative monthly withdrawals; 2.0% fee on total withdrawal amount exceeding €100/month. Spending Limits: Virtual Lite: €150 lifetime limit. Standard Virtual/Physical (Tier 1 Default): €5,000 per tx & daily limit, €10,000 monthly limit, €60,000 annual limit. ATM Limits (Tier 1): €2,000 per tx & daily limit, €2,000 monthly limit, €10,000 annual limit. Tier 2 (VIP/Upgraded): €10k daily / €25k monthly spend. Tier 3: €15k daily / €50k monthly spend.',
+    sources: ['https://www.bybit.eu/en-EU/help-center/article/Fees-and-Spending-Limits-Bybit-Card']
+  },
+  {
+    id: 'eu-card-transaction-flow',
+    category: 'card',
+    title: 'Bybit EU Card Settlement, Deduction Hierarchy & 3DS / SCA Rules',
+    keywords: ['card deduction hierarchy', 'card declined', '3ds authentication', 'sca limit', 'contactless limit', 'fx double fee', 'funding account balance'],
+    content: 'Bybit Card payments automatically deduct funds from the user Funding Account. Fund deduction hierarchy: Fiat EUR is deducted first; if EUR balance is insufficient, crypto assets selected in user pay settings are converted and deducted according to prioritized order. Double Fee Stacking: Paying in a non-EUR currency with crypto incurs BOTH the 0.5% FX fee and the 0.9% Crypto Conversion fee. PSD2 Strong Customer Authentication (SCA) limits: Contactless in-store transactions are capped at €50 per payment, up to a cumulative limit of €150 or 5 consecutive contactless transactions; once reached, contactless payments are declined until a Chip & PIN transaction is executed. Online purchases enforce 3D Secure (3DS) authentication via Bybit app push notifications.',
+    sources: ['https://www.bybit.eu/en-EU/help-center/article/FAQ-Bybit-Card-Transactions']
+  },
+  {
+    id: 'eu-card-rewards-cashback',
+    category: 'card',
+    title: 'Bybit EU Card Rewards Points and Auto Cashback Program',
+    keywords: ['card rewards', 'cashback', 'reward points', 'auto cashback', 'non-eligible transactions', 'points expiration'],
+    content: 'Bybit EU Card users earn reward points on eligible spending transactions. Users can activate Auto Cashback in Card Settings to automatically convert earned points into EUR fiat balance or preferred crypto. Non-Eligible Transactions (Zero Points Earned): Card fees, ATM cash withdrawals, financial/crypto asset purchases, prepaid card top-ups, tax payments, court/government payments, and gambling/lottery transactions. Refunds or chargebacks on past transactions result in automatic deduction of corresponding reward points; if points balance turns negative, future earned points offset the deficit.',
+    sources: ['https://www.bybit.eu/en-EU/help-center/article/Fees-and-Spending-Limits-Bybit-Card']
+  },
+  {
+    id: 'eu-card-security-management',
+    category: 'card',
+    title: 'Bybit Card Controls: Freeze, PIN Reset, Security Toggles & Replacement',
+    keywords: ['freeze card', 'unfreeze card', 'card pin reset', 'unblock cvv', 'card security toggles', 'lost card', 'stolen card', 'replace physical card'],
+    content: 'Cardholders manage card security in real-time on the Card Dashboard: 1) Freeze / Unfreeze: Instantly lock/unlock card. 2) Security Toggles: Manage Online Transactions (default ON), Non-3DS Online Transactions (default Virtual ON / Physical OFF; 2FA required to enable), and ATM Cash Withdrawals (default Virtual OFF / Physical ON). 3) PIN Reset: Reset 4-digit card PIN via 2FA verification. 4) Unblock CVV/PIN: If card is locked after 3 wrong CVV or PIN attempts, unlock on dashboard via 2FA. 5) Emergency Lost/Stolen Procedure: Immediately terminate compromised card on app; order physical replacement for €5 fee (old card permanently invalidated).',
+    sources: ['https://www.bybit.eu/en-EU/help-center/article/Fees-and-Spending-Limits-Bybit-Card']
+  },
+  {
+    id: 'eu-earn-and-rewards',
+    category: 'earn',
+    title: 'Bybit EU Regulated Earn & Staking Products',
+    keywords: ['bybit earn', 'staking', 'flexible earn', 'fixed savings', 'micar earn', 'legal title transfer', 'earn yield'],
+    content: 'Bybit EU provides MiCAR-compliant Earn and Staking products for major cryptocurrencies (Flexible Staking and Fixed-Term Savings). Mandatory Regulatory Disclaimer: In accordance with Bybit EU platform terms and EEA regulations, transferring crypto assets into Bybit Earn products transfers legal title of those assets to Bybit EU for yield generation. Earn balances are segregated from Unified Trading Accounts and held in dedicated yield accounts. High-risk, unbacked speculative structured products (such as Dual Asset, Shark Fin, Discount Buy, or uncollateralized lending) available on Bybit.com are strictly unavailable on Bybit EU under MiCA investor protection guidelines.',
+    sources: ['https://www.bybit.eu/en-EU/help-center/article/How-to-Understand-Your-Assets-Overview-and-Average-Cost']
+  },
+  {
+    id: 'eu-legal-entities-regulatory',
+    category: 'legal',
+    title: 'Bybit EU Corporate Entities, MiCA CASP License & Passporting',
+    keywords: ['bybit eu gmbh', 'bybit payments gmbh', 'vienna office', 'fma austria', 'mica casp', 'passporting', 'eea availability', 'restricted countries'],
+    content: 'Bybit EU operates under primary corporate entity Bybit EU GmbH (located at Donau-City-Straße 7, 1220 Vienna, Austria; Firmenbuch FN 605833g), authorized as a Crypto-Asset Service Provider (CASP) by the Austrian Financial Market Authority (FMA) under MiCAR. Fiat payment processing and e-money services are managed via Bybit Payments GmbH (EMI entity). Under MiCA passporting rights, Bybit EU legally provides regulated crypto exchange, custody, and fiat gateway services across 29 EEA member states. Restricted Users: Residents of non-EEA countries, USA, UK, Canada, China, North Korea, Iran, Syria, Crimea, Donetsk, Luhansk, and sanctioned jurisdictions are strictly excluded from bybit.eu.',
+    sources: [
+      'https://www.fma.gv.at/en/granting-of-authorisation-bybit-eu-gmbh/',
+      'https://www.bybit.eu/en-EU/help-center/article/Service-Restricted-Countries',
+      'https://www.bybit.eu/en-EU/help-center/article/IMPRINT-Impressum'
+    ]
+  },
+  {
+    id: 'eu-terms-risk-disclosures',
+    category: 'legal',
+    title: 'Bybit EU Terms & Conditions, Risk Disclosures & Asset Backing',
+    keywords: ['terms and conditions', 'legal terms', 'risk disclosure', 'no deposit protection', 'asset segregation', '1:1 backing', 'austrian law'],
+    content: 'Bybit EU platform operations and user agreements are governed by Austrian law and EU consumer protection directives. Key legal provisions: 1) 1:1 Asset Segregation: Customer crypto assets are held in segregated 1:1 custodian reserves in EEA institutions and never rehypothecated. 2) No Deposit Guarantee Scheme: Cryptocurrency holdings on Bybit EU are NOT covered by statutory bank deposit guarantee schemes (such as Austrian Einlagensicherung or EU deposit insurance). 3) Risk Disclosures: Users must acknowledge market volatility risk, spot margin liquidation risks, technological risks, and liquidity risks. Austrian courts in Vienna maintain primary jurisdiction for legal disputes.',
+    sources: [
+      'https://www.bybit.eu/en-EU/help-center/article/General-Terms',
+      'https://www.bybit.eu/en-EU/help-center/article/Bybit-Europe-Platform-Terms-and-Conditions'
+    ]
+  },
+  {
+    id: 'eu-complaints-dispute-resolution',
+    category: 'legal',
+    title: 'Bybit EU Formal Complaints Policy and External Dispute Escalation',
+    keywords: ['complaint', 'file complaint', 'dispute resolution', 'complaint portal', 'complaint timeline', 'bankenschlichtung', 'verbraucherschlichtung', 'fma complaint'],
+    content: 'Formal customer complaints against Bybit EU must be submitted via the official online Complaints Webform at https://www.bybit.eu/en-EU/help-center/s/webform. Mandatory admissibility details: customer full name, registered UID/email, clear statement of facts, ticket reference numbers, and specific requested redress. Handling Timelines: Bybit EU sends an official acknowledgment within 5 business days, and provides a final written resolution within 15 business days (extendable up to 35 business days in exceptional circumstances with written notice). External Dispute Escalation: If unresolved, EU customers may escalate to independent out-of-court dispute bodies: Joint Bank Dispute Resolution Body (www.bankenschlichtung.at), Austrian Consumer Arbitration (www.verbraucherschlichtung.at), European Online Dispute Resolution platform (ec.europa.eu/consumers/odr), or FMA Austria.',
+    sources: [
+      'https://www.bybit.eu/en-EU/help-center/article/Bybit-EU-GmbH-Complaints-Handling-Policy',
+      'https://www.bybit.eu/en-EU/help-center/s/webform'
+    ]
+  },
+  {
+    id: 'eu-privacy-gdpr-data',
+    category: 'legal',
+    title: 'Bybit EU GDPR Data Privacy Rights and Record Retention Rules',
+    keywords: ['gdpr', 'privacy policy', 'data protection', 'data retention', 'right to erasure', 'delete my data', 'ugb baor retention'],
+    content: 'Bybit EU GmbH acts as Data Controller under EU General Data Protection Regulation (GDPR). Users retain statutory GDPR rights: right of access, rectification, data portability, and restriction of processing. However, the GDPR Right to Erasure (Right to be Forgotten) is subject to statutory legal obligations. Under Austrian Anti-Money Laundering legislation, Commercial Code (UGB §212), and Federal Fiscal Code (BAO §132), Bybit EU is legally mandated to retain customer identity verification files, transaction histories, communication records, and banking data for 7 to 10 years following account termination.',
+    sources: ['https://www.scribd.com/document/890162822/Bybit-EU-GmbH-Privacy-Policy-and-Legal-Terms-Overview']
+  },
+  {
+    id: 'eu-aml-travel-rule-chargebacks',
+    category: 'legal',
+    title: 'Bybit EU AML Compliance, Travel Rule & Chargeback Policies',
+    keywords: ['aml compliance', 'travel rule verification', 'chargeback', 'refund policy', 'card chargeback', 'fraud review'],
+    content: 'Bybit EU strictly enforces EU Anti-Money Laundering (AML5/6) and CTF regulations. Automated transaction monitoring flags suspicious volume spikes, third-party deposits, or unverified wallet transfers, which may trigger temporary account restrictions pending compliance review. Crypto transfers exceeding Travel Rule threshold limits require full Originator and Beneficiary counterparty verification before releasing funds. Refund & Chargeback Policy: Crypto transactions on the blockchain are irreversible; fiat bank transfers deposited with incorrect reference tags are returned minus bank administration fees; fraudulent credit/debit card chargebacks result in immediate account freeze and reversal of corresponding asset balances or reward points.',
+    sources: ['https://www.bybit.eu/en-EU/help-center/article/FAQ-Travel-Rule']
+  },
+  {
+    id: 'global-bybit-overview-suite',
+    category: 'global',
+    title: 'Bybit.com Global Platform Overview and Product Suite',
+    keywords: ['bybit global', 'bybit.com', 'ben zhou', 'dubai hq', 'futures', 'perpetuals', 'options', 'copy trading', 'trading bots', 'pre-market'],
+    content: 'Bybit.com is the global cryptocurrency exchange platform founded in March 2018 by CEO Ben Zhou, headquartered in Dubai, UAE (DWTC / One Central) with offshore operations. Serving 80+ million users across 160+ countries, Bybit.com ranks as the #2 exchange globally by volume. Global Product Suite includes: 400+ Spot trading pairs, Pre-Market OTC trading, TradFi Stock Perpetuals & Pre-IPO contracts, Derivatives (USDT/USDC Linear Perpetuals, Inverse Futures, USDC Options with up to 100x UTA leverage), Copy Trading platform (10-15% profit sharing for Master Traders), Trading Bots (Spot Grid, Futures Grid, Futures Martingale, DCA), Bybit Earn (Savings, Dual Asset, Liquidity Mining, Shark Fin, RWA Earn), Crypto Loans, Web3 MPC Wallet, and Global Mastercard/Visa debit card.',
+    sources: ['https://www.bybit.com/en/help-center/article/Everything-You-Need-to-Know-to-Get-Started-on-Bybit']
+  },
+  {
+    id: 'global-vip-fees-mnt',
+    category: 'global',
+    title: 'Bybit.com Global VIP Fee Schedule and MNT Discount',
+    keywords: ['bybit.com fees', 'global vip tiers', 'mnt discount', 'derivatives fee', 'options fee', 'global fee schedule'],
+    content: 'Bybit.com global VIP tiers range from VIP 0 to Supreme VIP / Pro based on meeting ANY ONE criterion: USD Asset Balance, 30-Day Spot Volume, or 30-Day Derivatives Volume. VIP 0 Base Rates: Spot Trading: 0.1000% Maker / 0.1000% Taker; USDT/USDC Derivatives: 0.0200% Maker / 0.0550% Taker; USDC Options: 0.0200% Maker / 0.0200% Taker. VIP 1 (>= $100k balance / $1M spot / $10M perps): 0.0675% / 0.0800% Spot, 0.0180% / 0.0400% Perps. Fee discounts: Users who enable Pay Fees with MNT on Bybit.com receive a 25% discount on Spot maker/taker fees (VIP 0 Spot reduces to 0.0750%).',
+    sources: [
+      'https://www.bybit.com/en/help-center/article/Trading-Fee-Structure',
+      'https://www.bybit.com/en/help-center/article/Benefits-of-the-VIP-Program'
+    ]
+  },
+  {
+    id: 'global-terms-and-restrictions',
+    category: 'global',
+    title: 'Bybit.com Terms of Service, Restricted Countries & ADL Rules',
+    keywords: ['bybit.com terms', 'restricted countries', 'bvi law', 'siac arbitration', 'auto deleveraging', 'adl', 'liquidation engine'],
+    content: 'Bybit.com terms govern non-EEA global users and are governed by BVI / offshore laws. Restricted Jurisdictions: Residents of the United States, Mainland China, Singapore, Canada, Hong Kong, North Korea, Cuba, Iran, Syria, Crimea, Donetsk, Luhansk, and UK (retail derivatives) are strictly prohibited from using Bybit.com. Disputes must be submitted to binding individual arbitration (SIAC/HKIAC) with explicit class-action waivers. Platform mechanics feature automated liquidations and Auto-Deleveraging (ADL): if extreme market volatility exhausts the Insurance Fund, opposing profitable leveraged positions are forcibly deleveraged without platform compensation.',
+    sources: [
+      'https://www.bybit.com/en/help-center/article/Service-Restricted-Countries',
+      'https://www.bybit.com/en/help-center/topic-list/terms-of-services'
+    ]
+  },
+  {
+    id: 'eu-vs-global-key-differences',
+    category: 'comparisons',
+    title: 'Bybit EU (bybit.eu) vs Bybit.com Global Structural Differences',
+    keywords: ['bybit eu vs bybit com', 'platform differences', 'micar compliance', 'eu derivatives ban', 'p2p replaced', 'usdt vs usdc', 'asset segregation'],
+    content: 'Key structural differences between Bybit EU (bybit.eu) and Bybit.com (Global): 1) Operating Entity & Regulation: Bybit EU GmbH (Vienna, MiCAR CASP regulated by Austrian FMA) vs Bybit Fintech Ltd (Dubai/BVI offshore). 2) Derivatives & Leverage: Unregulated derivatives, perps, futures, options, and 100x leverage are strictly PROHIBITED on Bybit EU under MiCA; available on Bybit.com. 3) Stablecoins: Bybit EU restricts non-compliant EMTs in favor of MiCAR Title III compliant stablecoins (USDC, EUR tokens); Bybit.com supports unrestricted USDT/USDE. 4) P2P & Gateways: Bybit EU replaces P2P with licensed EUR banking gateways (SEPA Instant, iDEAL, PayPal, Cards); Bybit.com offers global P2P. 5) Consumer Rights: Bybit EU provides 1:1 custodian asset segregation, Austrian law jurisdiction, and EU ombudsmen access.',
+    sources: ['https://www.bybit.eu/en-EU/learn/regulation-and-micar/what-european-crypto-users-should-know-about-bybit-eu-and-micar']
+  },
+  {
+    id: 'eu-vs-global-derivatives-mifid',
+    category: 'comparisons',
+    title: 'Why Derivatives Are Unavailable on Bybit EU & Future MiFID II Plans',
+    keywords: ['why no futures', 'no derivatives eu', 'mifid ii license', 'bybit x gmbh', 'futures prohibition', 'leveraged trading restricted'],
+    content: 'European Union Markets in Crypto-Assets Regulation (MiCAR) prohibits CASP entities like Bybit EU GmbH from offering unregulated crypto derivatives, futures, options, or high leverage to retail EEA residents. All EEA residents on Bybit.com have been migrated to bybit.eu to ensure full EU compliance. Future Derivatives Initiative: The Bybit EU Group has established Bybit X GmbH to apply for a MiFID II license from European regulators, with the goal of unlocking compliant, regulated crypto derivatives across Europe in the future.',
+    sources: ['https://www.prnewswire.com/news-releases/bybit-eu-group-sets-sights-on-mifid-ii-license-to-unlock-derivatives-market-across-europe-302547687.html']
+  },
+  {
+    id: 'eu-vs-global-bybit-card',
+    category: 'comparisons',
+    title: 'Bybit EU Card vs Bybit Global Card Differences',
+    keywords: ['bybit eu card vs global card', 'card differences', 'eur card vs multi currency', 'eea payment rules', 'card limits comparison'],
+    content: 'Comparison between Bybit EU Card and Bybit Global Card: Bybit EU Card is denominated exclusively in EUR, issued under EEA payment service directives and PSD2 Strong Customer Authentication (SCA) rules, and available only to verified EEA residents. Bybit Global Card is issued via offshore Mastercard/Visa networks supporting multi-currency global balances and higher VIP cashback tiers (up to 10%). While the EU Card enforces strict PSD2 contactless limits (€50 / €150 cumulative PIN requirement) and 0.5% FX fee, the Global Card operates under international network rules with different country eligibility lists.',
+    sources: ['https://www.bybit.eu/en-EU/help-center/article/Fees-and-Spending-Limits-Bybit-Card']
+  },
+  {
+    id: 'recent-announcements-launches',
+    category: 'announcements',
+    title: 'Recent Bybit Product Announcements and Strategic Developments',
+    keywords: ['announcements', 'tradfi stock perps', 'pre-ipo perps', 'rwa earn', 'bybit eu launch', 'mifid ii application', 'islamic accounts'],
+    content: 'Recent major Bybit announcements across global and EU platforms: 1) Launch of TradFi Stock Perpetuals & Pre-IPO Contracts: Introduced 20+ US stock perpetuals (TSLA, NVDA, AAPL) and Pre-IPO assets (SHEINUSDT Pre-IPO) on global platform. 2) RWA Earn Expansion: Launched Real-World Asset yield products featuring tokenized US Treasury yields with promotional APR boosts. 3) Bybit EU Platform Launch & MiFID II Push: Official launch of MiCAR-regulated bybit.eu platform in Vienna, and setup of Bybit X GmbH to pursue MiFID II authorization. 4) Shariah-Compliant Islamic Accounts: Global launch of Islamic Accounts eliminating overnight funding fees and swap charges, validated by Islamic finance scholars.',
+    sources: [
+      'https://announcements.bybit.com/en/article/bybit-launches-first-batch-of-20-us-stock-perpetual-contracts-blt500ae85f0b1eef0f/',
+      'https://www.prnewswire.com/news-releases/bybit-eu-group-sets-sights-on-mifid-ii-license-to-unlock-derivatives-market-across-europe-302547687.html'
+    ]
+  }
+];

@@ -26,7 +26,7 @@ import TierChip from '../components/TierChip';
 import DateNav from '../components/DateNav';
 import PageHeader from '../components/PageHeader';
 import type { DailyEntry, WeeklyEntry } from '../types';
-import { todayLocal, dateFromKey, addDays, startOfWeekLocal } from '../dateUtils';
+import { dateFromKey, addDays, startOfWeekLocal, workDateLocal } from '../dateUtils';
 
 const STEPPER_FIELDS: Array<{ key: keyof DailyEntry; label: string; min?: number; max?: number; points?: string }> = [
   { key: 'chats_handled', label: 'Chats Handled', min: 0, points: '×1' },
@@ -291,8 +291,8 @@ function productivityPoints(entry: DailyEntry): number {
 export default function Today() {
   const { entries, targets, updateEntry, notify, qaEntries, weeklyEntries, saveWeeklyEntry, deleteWeeklyEntry } = useApp();
   const [mode, setMode] = useState<'daily' | 'weekly'>('daily');
-  const [date, setDate] = useState(todayLocal());
-  const [weekStart, setWeekStart] = useState(startOfWeekLocal());
+  const [date, setDate] = useState(workDateLocal());
+  const [weekStart, setWeekStart] = useState(startOfWeekLocal(workDateLocal()));
   const rawEntry = entries[date] ?? makeEmptyEntry(date);
   const entry = useMemo<DailyEntry>(
     () => ({
@@ -583,7 +583,7 @@ export default function Today() {
       {score !== null && grade !== null && (
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            {date === todayLocal() ? "Today's" : 'Day'} score:{' '}
+            {date === workDateLocal() ? "Today's" : 'Day'} score:{' '}
             <strong>{score.toFixed(2)}</strong>
           </Typography>
         </Box>

@@ -1,5 +1,5 @@
 import type { DailyEntry, KPITarget, Tier, Thresholds, GradeResult, MetricBreakdown, TaskItem, EscalationItem, WeeklyEntry } from './types';
-import { todayLocal, dateKeyFromDate } from './dateUtils';
+import { dateFromKey, dateKeyFromDate, workDateLocal } from './dateUtils';
 
 export const TIER_POINTS: Record<Tier, number> = {
   S: 5,
@@ -155,7 +155,7 @@ export function computeRollingAverage(
   qaPct: number | null = null,
 ): Array<{ date: string; score: number | null }> {
   const result: Array<{ date: string; score: number | null }> = [];
-  const today = new Date();
+  const today = dateFromKey(workDateLocal());
 
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today);
@@ -217,7 +217,7 @@ export function expandWeeklyEntries(
   weeklyEntries: Record<string, WeeklyEntry>,
 ): Record<string, DailyEntry> {
   const merged: Record<string, DailyEntry> = { ...entries };
-  const today = todayLocal();
+  const today = workDateLocal();
   for (const week of Object.values(weeklyEntries)) {
     const days = weekDays(week.week_start);
     // Only spread a week's totals over days that have already passed or are

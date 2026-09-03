@@ -15,11 +15,11 @@ import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import { useTheme } from '@mui/material/styles';
 import { toneStyle } from '../theme';
-import { todayLocal } from '../dateUtils';
+import { workDateLocal } from '../dateUtils';
 import type { EscalationItem } from '../types';
 
 function today(): string {
-  return todayLocal();
+  return workDateLocal();
 }
 
 type FilterStatus = 'all' | 'open' | 'escalated' | 'resolved';

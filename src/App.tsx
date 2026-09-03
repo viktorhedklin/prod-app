@@ -1,10 +1,10 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
+import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
-import Fade from '@mui/material/Fade';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Menu from '@mui/material/Menu';
@@ -15,35 +15,35 @@ import TodayIcon from '@mui/icons-material/Today';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import ReportIcon from '@mui/icons-material/Report';
 import PsychologyIcon from '@mui/icons-material/Psychology';
+import HubIcon from '@mui/icons-material/Hub';
 import VerifiedIcon from '@mui/icons-material/Verified';
-import SchoolIcon from '@mui/icons-material/School';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { lightTheme, darkTheme } from './theme';
 import { AppProvider } from './AppContext';
 
-const Dashboard = lazy(() => import('./screens/Dashboard'));
+const Copilot = lazy(() => import('./components/CopilotInterface'));
+const Dashboard = lazy(() => import('./screens/SmartDashboard'));
 const Today = lazy(() => import('./screens/Today'));
 const Tasks = lazy(() => import('./screens/Tasks'));
 const Escalations = lazy(() => import('./screens/Escalations'));
 const Reflection = lazy(() => import('./screens/Reflection'));
-const Growth = lazy(() => import('./screens/Growth'));
 const QaReview = lazy(() => import('./screens/QaReview'));
-const Coaching = lazy(() => import('./screens/Coaching'));
+const Mind = lazy(() => import('./screens/Mind'));
 
-type Tab = 'dashboard' | 'today' | 'tasks' | 'escalations' | 'reflection' | 'growth' | 'qa' | 'coaching';
+type Tab = 'copilot' | 'dashboard' | 'today' | 'tasks' | 'escalations' | 'reflection' | 'qa' | 'mind';
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof DashboardIcon }> = [
+  { id: 'copilot', label: 'Copilot', icon: SmartToyIcon },
   { id: 'dashboard', label: 'Dashboard', icon: DashboardIcon },
+  { id: 'mind', label: 'Mind', icon: HubIcon },
   { id: 'today', label: 'Today', icon: TodayIcon },
   { id: 'tasks', label: 'Tasks', icon: TaskAltIcon },
   { id: 'escalations', label: 'Escalations', icon: ReportIcon },
   { id: 'reflection', label: 'Reflect', icon: PsychologyIcon },
   { id: 'qa', label: 'QA Review', icon: VerifiedIcon },
-  { id: 'coaching', label: 'Coaching', icon: SchoolIcon },
-  { id: 'growth', label: 'My Growth', icon: TrendingUpIcon },
 ];
 
 function Nav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
@@ -79,7 +79,7 @@ function Nav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) 
             boxShadow: '0 3px 8px rgba(13,148,136,0.3)',
           }}
         >
-          <TrendingUpIcon sx={{ fontSize: 18 }} />
+          <SmartToyIcon sx={{ fontSize: 18 }} />
         </Box>
         <Typography
           sx={{
@@ -90,7 +90,7 @@ function Nav({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) 
             fontFamily: '"Plus Jakarta Sans Variable", "Roboto", sans-serif',
           }}
         >
-          Productivity Grader
+          Vesper Copilot
         </Typography>
       </Box>
       <Box
@@ -251,8 +251,62 @@ function MobileNav({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
   );
 }
 
+function MainContent({ activeTab, onNavigate }: { activeTab: Tab; onNavigate: (t: string) => void }) {
+  if (activeTab === 'copilot') {
+    return (
+      <Suspense fallback={<Box sx={{ py: 6, textAlign: 'center' }}>Loading Copilot...</Box>}>
+        <ErrorBoundary screenName="Copilot" onNavigateHome={() => onNavigate('copilot')}>
+          <Copilot onNavigate={(t: string) => onNavigate(t)} />
+        </ErrorBoundary>
+      </Suspense>
+    );
+  }
+
+  return (
+    <Box component="main" sx={{ p: { xs: 2, sm: 3 }, maxWidth: 1280, mx: 'auto' }}>
+      <Suspense fallback={<Box sx={{ py: 6, textAlign: 'center' }}>Loading...</Box>}>
+        {activeTab === 'dashboard' && (
+          <ErrorBoundary screenName="Dashboard" onNavigateHome={() => onNavigate('copilot')}>
+            <Dashboard onNavigate={onNavigate} />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'today' && (
+          <ErrorBoundary screenName="Today" onNavigateHome={() => onNavigate('copilot')}>
+            <Today />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'tasks' && (
+          <ErrorBoundary screenName="Tasks" onNavigateHome={() => onNavigate('copilot')}>
+            <Tasks />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'escalations' && (
+          <ErrorBoundary screenName="Escalations" onNavigateHome={() => onNavigate('copilot')}>
+            <Escalations />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'reflection' && (
+          <ErrorBoundary screenName="Reflection" onNavigateHome={() => onNavigate('copilot')}>
+            <Reflection />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'qa' && (
+          <ErrorBoundary screenName="QA Review" onNavigateHome={() => onNavigate('copilot')}>
+            <QaReview />
+          </ErrorBoundary>
+        )}
+        {activeTab === 'mind' && (
+          <ErrorBoundary screenName="Mind" onNavigateHome={() => onNavigate('copilot')}>
+            <Mind />
+          </ErrorBoundary>
+        )}
+      </Suspense>
+    </Box>
+  );
+}
+
 function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [activeTab, setActiveTab] = useState<Tab>('copilot');
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window === 'undefined') return false;
     const saved = localStorage.getItem('theme-mode');
@@ -280,67 +334,21 @@ function App() {
               bgcolor: 'background.paper',
               border: '1px solid',
               borderColor: 'divider',
-              color: darkMode ? 'warning.main' : 'text.secondary',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
-              '&:hover': { bgcolor: 'background.default' },
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              '&:hover': { bgcolor: 'background.paper', transform: 'scale(1.05)' },
             }}
           >
-            {darkMode ? <LightModeIcon sx={{ fontSize: 20 }} /> : <DarkModeIcon sx={{ fontSize: 20 }} />}
+            {darkMode ? <LightModeIcon sx={{ color: '#FBBF24' }} /> : <DarkModeIcon sx={{ color: '#0F766E' }} />}
           </IconButton>
         </Box>
-        <Box sx={{ py: { xs: 2, md: 2.5 }, px: { xs: 1.5, md: 0 } }}>
-          <Fade in key={activeTab} timeout={250}>
-            <Box>
-              {activeTab === 'dashboard' && (
-                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
-                  <Dashboard onNavigate={setActiveTab} />
-                </Suspense>
-              )}
-              {activeTab === 'today' && (
-                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
-                  <Today />
-                </Suspense>
-              )}
-              {activeTab === 'tasks' && (
-                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
-                  <Tasks />
-                </Suspense>
-              )}
-              {activeTab === 'escalations' && (
-                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
-                  <Escalations />
-                </Suspense>
-              )}
-              {activeTab === 'reflection' && (
-                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
-                  <Reflection />
-                </Suspense>
-              )}
-              {activeTab === 'qa' && (
-                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
-                  <QaReview />
-                </Suspense>
-              )}
-              {activeTab === 'coaching' && (
-                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
-                  <Coaching />
-                </Suspense>
-              )}
-              {activeTab === 'growth' && (
-                <Suspense fallback={<Box sx={{ py: 4, textAlign: 'center', color: 'text.secondary' }}>Loading…</Box>}>
-                  <Growth />
-                </Suspense>
-              )}
-            </Box>
-          </Fade>
-        </Box>
-        {isMobile && <MobileNav active={activeTab} onChange={setActiveTab} />}
+        <MainContent activeTab={activeTab} onNavigate={(t: string) => setActiveTab(t as Tab)} />
+        {isMobile ? <MobileNav active={activeTab} onChange={setActiveTab} /> : null}
       </Box>
     </ThemeProvider>
   );
 }
 
-export default function Root() {
+export default function AppWithProvider() {
   return (
     <AppProvider>
       <App />

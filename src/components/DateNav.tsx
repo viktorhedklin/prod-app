@@ -6,7 +6,7 @@ import Chip from '@mui/material/Chip';
 import Typography from '@mui/material/Typography';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { addDays, formatLongDate, todayLocal } from '../dateUtils';
+import { addDays, formatLongDate, workDateLocal } from '../dateUtils';
 
 interface Props {
   date: string;
@@ -15,11 +15,11 @@ interface Props {
 }
 
 function isToday(date: string): boolean {
-  return date === todayLocal();
+  return date === workDateLocal();
 }
 
 export default function DateNav({ date, onChange, datesWithData }: Props) {
-  const today = todayLocal();
+  const today = workDateLocal();
   const atToday = isToday(date);
   const hasData = datesWithData?.has(date) ?? false;
 

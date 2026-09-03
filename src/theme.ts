@@ -30,14 +30,14 @@ export function toneStyle(tone: StatusTone, theme: Theme): { bg: string; color: 
   };
 }
 
-// Deep Teal brand palette (option A)
+// Deep Teal brand palette (JARVIS primary #14B8A6, secondary #06B6D4)
 const BRAND = {
-  main: '#0D9488',
-  light: '#14B8A6',
+  main: '#14B8A6',
+  light: '#2DD4BF',
   dark: '#0F766E',
   contrastText: '#FFFFFF',
-  tint: '#E6F4F2',
-  gradient: 'linear-gradient(135deg, #0F766E 0%, #0D9488 55%, #14B8A6 100%)',
+  tint: 'rgba(20,184,166,0.12)',
+  gradient: 'linear-gradient(135deg, #0F766E 0%, #14B8A6 55%, #06B6D4 100%)',
 };
 
 const TIERS = {
@@ -54,7 +54,7 @@ const TIERS = {
 
 // Shared component overrides that adapt to both light and dark themes via tokens
 const componentOverrides = (mode: 'light' | 'dark'): ThemeOptions['components'] => {
-  const divider = mode === 'dark' ? 'rgba(255,255,255,0.12)' : '#E4E4E4';
+  const divider = mode === 'dark' ? 'rgba(148,163,184,0.12)' : '#E4E4E4';
   return {
     MuiCssBaseline: {
       styleOverrides: {
@@ -70,8 +70,8 @@ const componentOverrides = (mode: 'light' | 'dark'): ThemeOptions['components'] 
           '100%': { opacity: 1, transform: 'scale(1)' },
         },
         '@keyframes pulseGlow': {
-          '0%, 100%': { boxShadow: '0 0 0 0 rgba(13,148,136,0.18)' },
-          '50%': { boxShadow: '0 0 0 7px rgba(13,148,136,0)' },
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(20,184,166,0.25)' },
+          '50%': { boxShadow: '0 0 0 8px rgba(20,184,166,0)' },
         },
         '@keyframes shimmer': {
           '0%': { backgroundPosition: '-200% 0' },
@@ -117,7 +117,7 @@ const componentOverrides = (mode: 'light' | 'dark'): ThemeOptions['components'] 
         },
         contained: {
           '&:hover': {
-            boxShadow: '0 6px 18px rgba(13,148,136,0.28)',
+            boxShadow: '0 6px 18px rgba(20,184,166,0.28)',
           },
         },
         containedPrimary: {
@@ -163,7 +163,7 @@ const componentOverrides = (mode: 'light' | 'dark'): ThemeOptions['components'] 
             borderRadius: 10,
             transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
             '&:focus-within': {
-              boxShadow: '0 0 0 3px rgba(13,148,136,0.15)',
+              boxShadow: '0 0 0 3px rgba(20,184,166,0.15)',
             },
           },
         },
@@ -179,10 +179,10 @@ const componentOverrides = (mode: 'light' | 'dark'): ThemeOptions['components'] 
         },
         head: {
           fontWeight: 700,
-          color: mode === 'dark' ? 'rgba(255,255,255,0.6)' : '#6B6B6B',
+          color: mode === 'dark' ? 'rgba(148,163,184,0.7)' : '#6B6B6B',
           fontSize: '0.72rem',
           textTransform: 'uppercase',
-          letterSpacing: '0.05em',
+          letterSpacing: '0.08em',
         },
       },
     },
@@ -215,7 +215,10 @@ const lightTheme = createTheme({
     mode: 'light',
     primary: BRAND,
     secondary: {
-      main: '#6B6B6B',
+      main: '#06B6D4',
+      light: '#22D3EE',
+      dark: '#0891B2',
+      contrastText: '#FFFFFF',
     },
     background: {
       default: '#F8F9F7',
@@ -253,35 +256,19 @@ const lightTheme = createTheme({
     h6: { fontWeight: 700, letterSpacing: '-0.01em' },
     body1: { fontSize: '0.9375rem' },
     body2: { fontSize: '0.875rem' },
-    caption: { fontSize: '0.75rem', color: '#5D6B68' },
+    caption: {
+      fontSize: '0.75rem',
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      fontWeight: 600,
+    },
+    overline: {
+      fontSize: '0.75rem',
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      fontWeight: 600,
+    },
   },
-  shadows: [
-    'none',
-    '0 1px 2px rgba(22,33,31,0.05)',
-    '0 2px 4px rgba(22,33,31,0.06)',
-    '0 4px 12px rgba(22,33,31,0.07)',
-    '0 6px 16px rgba(22,33,31,0.08)',
-    '0 8px 24px rgba(22,33,31,0.09)',
-    '0 10px 28px rgba(22,33,31,0.1)',
-    '0 12px 32px rgba(22,33,31,0.11)',
-    '0 14px 36px rgba(22,33,31,0.12)',
-    '0 16px 40px rgba(22,33,31,0.12)',
-    '0 18px 44px rgba(22,33,31,0.13)',
-    '0 20px 48px rgba(22,33,31,0.13)',
-    '0 22px 52px rgba(22,33,31,0.14)',
-    '0 24px 56px rgba(22,33,31,0.14)',
-    '0 26px 60px rgba(22,33,31,0.15)',
-    '0 28px 64px rgba(22,33,31,0.15)',
-    '0 30px 68px rgba(22,33,31,0.16)',
-    '0 32px 72px rgba(22,33,31,0.16)',
-    '0 34px 76px rgba(22,33,31,0.17)',
-    '0 36px 80px rgba(22,33,31,0.17)',
-    '0 38px 84px rgba(22,33,31,0.18)',
-    '0 40px 88px rgba(22,33,31,0.18)',
-    '0 42px 92px rgba(22,33,31,0.19)',
-    '0 44px 96px rgba(22,33,31,0.19)',
-    '0 46px 100px rgba(22,33,31,0.2)',
-  ],
   components: componentOverrides('light'),
 });
 
@@ -290,15 +277,18 @@ const darkTheme = createTheme({
     mode: 'dark',
     primary: BRAND,
     secondary: {
-      main: '#A6B3B0',
+      main: '#06B6D4',
+      light: '#22D3EE',
+      dark: '#0891B2',
+      contrastText: '#FFFFFF',
     },
     background: {
-      default: '#0E1312',
-      paper: '#161D1B',
+      default: '#020617',
+      paper: '#0F172A',
     },
     text: {
-      primary: '#E8EFED',
-      secondary: '#9AA9A6',
+      primary: '#E2E8F0',
+      secondary: '#94A3B8',
     },
     error: {
       main: '#F87171',
@@ -312,7 +302,7 @@ const darkTheme = createTheme({
       main: '#FBBF24',
       light: 'rgba(251,191,36,0.14)',
     },
-    divider: 'rgba(255,255,255,0.1)',
+    divider: 'rgba(148,163,184,0.12)',
   },
   shape: { borderRadius: 12 },
   typography: {
@@ -328,35 +318,19 @@ const darkTheme = createTheme({
     h6: { fontWeight: 700, letterSpacing: '-0.01em' },
     body1: { fontSize: '0.9375rem' },
     body2: { fontSize: '0.875rem' },
-    caption: { fontSize: '0.75rem', color: '#9AA9A6' },
+    caption: {
+      fontSize: '0.75rem',
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      fontWeight: 600,
+    },
+    overline: {
+      fontSize: '0.75rem',
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      fontWeight: 600,
+    },
   },
-  shadows: [
-    'none',
-    '0 1px 2px rgba(0,0,0,0.4)',
-    '0 2px 4px rgba(0,0,0,0.45)',
-    '0 4px 12px rgba(0,0,0,0.5)',
-    '0 6px 16px rgba(0,0,0,0.5)',
-    '0 8px 24px rgba(0,0,0,0.55)',
-    '0 10px 28px rgba(0,0,0,0.55)',
-    '0 12px 32px rgba(0,0,0,0.6)',
-    '0 14px 36px rgba(0,0,0,0.6)',
-    '0 16px 40px rgba(0,0,0,0.6)',
-    '0 18px 44px rgba(0,0,0,0.65)',
-    '0 20px 48px rgba(0,0,0,0.65)',
-    '0 22px 52px rgba(0,0,0,0.65)',
-    '0 24px 56px rgba(0,0,0,0.7)',
-    '0 26px 60px rgba(0,0,0,0.7)',
-    '0 28px 64px rgba(0,0,0,0.7)',
-    '0 30px 68px rgba(0,0,0,0.75)',
-    '0 32px 72px rgba(0,0,0,0.75)',
-    '0 34px 76px rgba(0,0,0,0.75)',
-    '0 36px 80px rgba(0,0,0,0.8)',
-    '0 38px 84px rgba(0,0,0,0.8)',
-    '0 40px 88px rgba(0,0,0,0.8)',
-    '0 42px 92px rgba(0,0,0,0.85)',
-    '0 44px 96px rgba(0,0,0,0.85)',
-    '0 46px 100px rgba(0,0,0,0.85)',
-  ],
   components: componentOverrides('dark'),
 });
 

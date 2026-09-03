@@ -19,7 +19,7 @@ import StatCard from '../components/StatCard';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import type { TaskItem } from '../types';
-import { todayLocal } from '../dateUtils';
+import { workDateLocal } from '../dateUtils';
 
 type FilterStatus = 'all' | 'pending' | 'submitted';
 
@@ -39,7 +39,7 @@ function TaskRow({
   onRemove: () => void;
 }) {
   const overdue =
-    task.status === 'pending' && task.completion_date && task.completion_date < todayLocal();
+    task.status === 'pending' && task.completion_date && task.completion_date < workDateLocal();
   return (
     <Box
       sx={{
@@ -112,7 +112,7 @@ function TaskRow({
 
 export default function Tasks() {
   const { tasks, addTask, updateTask, removeTask, notify } = useApp();
-  const today = todayLocal();
+  const today = workDateLocal();
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [form, setForm] = useState({
     brief_explanation: '',
