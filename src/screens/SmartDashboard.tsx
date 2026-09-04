@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import Box from '@mui/material/Box';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import Card from '@mui/material/Card';
@@ -58,7 +59,7 @@ import { useApp } from '../useApp';
 import {
   SystemStatusChip,
   HudGauge,
-  StatusReadout,
+  TelemetryReadout,
   BootSplash,
   HudFrame,
   SystemMonitorPanel,
@@ -355,6 +356,7 @@ function generateWeakestMetricCommentary(
 
 export default function SmartDashboard({ onNavigate }: SmartDashboardProps) {
   const theme = useTheme();
+  const isMobileHud = useMediaQuery(theme.breakpoints.down('sm'));
   const {
     entries,
     weeklyEntries,
@@ -896,64 +898,103 @@ export default function SmartDashboard({ onNavigate }: SmartDashboardProps) {
           </Paper>
         </motion.div>
 
-        {/* 1.5 JARVIS COCKPIT TELEMETRY */}
+        {/* JARVIS AI CORE — one unified cockpit: reactor + telemetry overlaid AS a HUD,
+            not stacked as separate boxes. Everything anchors to the single reactor scene. */}
         <BootSplash />
 
-        {/* AI CORE — live 3D reactor visualization, reflects overall system state */}
         <HudFrame label="AI CORE" statusDot={systemStatus === 'critical' ? 'danger' : systemStatus === 'attention' ? 'warn' : 'ok'}>
-          <Box sx={{ height: { xs: 220, sm: 280 }, position: 'relative', bgcolor: '#020617', borderRadius: 1, overflow: 'hidden' }}>
+          <Box
+            sx={{
+              height: { xs: 320, sm: 380, md: 420 },
+              position: 'relative',
+              bgcolor: '#020617',
+              borderRadius: 1,
+              overflow: 'hidden',
+            }}
+          >
+            {/* Reactor fills the entire frame — the single dominant visual */}
             <JarvisStateProvider state={jarvisCoreState} cognitiveLoad={jarvisCognitiveLoad}>
               <Suspense fallback={<Box sx={{ width: '100%', height: '100%' }} />}>
                 <NuclearCore />
               </Suspense>
             </JarvisStateProvider>
-          </Box>
-        </HudFrame>
 
-        <HudFrame
-          label="COCKPIT TELEMETRY"
-          statusDot={systemStatus === 'critical' ? 'danger' : systemStatus === 'attention' ? 'warn' : 'ok'}
-        >
-          <Box
-            sx={{
-              p: { xs: 2, sm: 2.5 },
-              display: 'flex',
-              flexDirection: { xs: 'column', md: 'row' },
-              alignItems: { xs: 'stretch', md: 'center' },
-              gap: 3,
-            }}
-          >
-            <Stack direction="row" alignItems="center" spacing={2.5} sx={{ minWidth: { md: 340 } }}>
+            {/* Status chip — floats top-left over the scene, no box beneath it */}
+            <Box sx={{ position: 'absolute', top: 12, left: { xs: 10, sm: 16 }, zIndex: 5, pointerEvents: 'none' }}>
               <SystemStatusChip status={systemStatus} />
+            </Box>
+
+            {/* Score gauge — floats mid-left, part of the reactor scene, not a separate card */}
+            <Box
+              sx={{
+                position: 'absolute',
+                left: { xs: 4, sm: 16, md: 28 },
+                top: { xs: '38%', sm: '42%' },
+                transform: 'translateY(-50%)',
+                zIndex: 5,
+                pointerEvents: 'none',
+              }}
+            >
               <HudGauge
                 score={(currentWeekGrade.score ?? 0) * 20}
                 label="CURRENT SCORE"
                 tier={currentWeekGrade.grade ? formatTierLabel(currentWeekGrade.grade) : undefined}
+                size={isMobileHud ? 76 : 104}
               />
+            </Box>
+
+            {/* Forecast gauge — mirrors on the right */}
+            <Box
+              sx={{
+                position: 'absolute',
+                right: { xs: 4, sm: 16, md: 28 },
+                top: { xs: '38%', sm: '42%' },
+                transform: 'translateY(-50%)',
+                zIndex: 5,
+                pointerEvents: 'none',
+              }}
+            >
               <HudGauge
                 score={(forecast?.projectedScore ?? 0) * 20}
                 label="EOW FORECAST"
                 tier={forecast ? forecast.trend.toUpperCase() : undefined}
+                size={isMobileHud ? 76 : 104}
               />
-            </Stack>
-            <Grid container spacing={{ xs: 1.5, sm: 2 }} sx={{ flex: 1 }}>
-              <Grid size={{ xs: 6, sm: 3 }}>
-                <StatusReadout label="TODAY VOLUME" value={String(todayVolume)} />
-              </Grid>
-              <Grid size={{ xs: 6, sm: 3 }}>
-                <StatusReadout
-                  label="CSAT AVG"
+            </Box>
+
+            {/* Bottom telemetry strip — thin ambient readouts scrimmed over the reactor's
+                floor, no card chrome. This IS the "cockpit telemetry" now, integrated. */}
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                zIndex: 5,
+                pt: 5,
+                pb: { xs: 1.25, sm: 1.5 },
+                px: { xs: 1.5, sm: 3 },
+                background: 'linear-gradient(to top, rgba(2, 6, 23, 0.94) 0%, rgba(2, 6, 23, 0.55) 55%, rgba(2, 6, 23, 0) 100%)',
+                pointerEvents: 'none',
+              }}
+            >
+              <Stack
+                direction="row"
+                justifyContent="center"
+                alignItems="center"
+                spacing={{ xs: 2, sm: 4 }}
+                divider={<Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(148, 163, 184, 0.18)', my: 0.25 }} />}
+              >
+                <TelemetryReadout label="VOLUME" value={String(todayVolume)} />
+                <TelemetryReadout
+                  label="CSAT"
                   value={weekCsat !== null ? weekCsat.toFixed(2) : '—'}
                   delta={scoreDiff !== 0 ? Number((scoreDiff * 10).toFixed(1)) : null}
                 />
-              </Grid>
-              <Grid size={{ xs: 6, sm: 3 }}>
-                <StatusReadout label="BACKLOG" value={`${backlogInfo.backlog.toFixed(1)}h`} />
-              </Grid>
-              <Grid size={{ xs: 6, sm: 3 }}>
-                <StatusReadout label="PENDING TASKS" value={String(pendingTasks)} />
-              </Grid>
-            </Grid>
+                <TelemetryReadout label="BACKLOG" value={`${backlogInfo.backlog.toFixed(1)}h`} />
+                <TelemetryReadout label="PENDING" value={String(pendingTasks)} />
+              </Stack>
+            </Box>
           </Box>
         </HudFrame>
 

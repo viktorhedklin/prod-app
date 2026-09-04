@@ -7,6 +7,9 @@ export type { HudGaugeProps } from './HudGauge';
 export { default as StatusReadout } from './StatusReadout';
 export type { StatusReadoutProps } from './StatusReadout';
 
+export { default as TelemetryReadout } from './TelemetryReadout';
+export type { TelemetryReadoutProps } from './TelemetryReadout';
+
 export { default as BootSplash } from './BootSplash';
 
 export { default as LiveIntelligenceFeed } from './LiveIntelligenceFeed';
