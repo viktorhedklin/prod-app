@@ -221,8 +221,15 @@ export default function QaReview() {
       setCases(String(result.cases_reviewed));
       setPct(String(result.qa_percentage));
       setNotes(result.notes ?? '');
-      const validCats = result.categories.filter((c) => CATEGORY_OPTIONS.includes(c));
-      setCategories((prev) => Array.from(new Set([...prev, ...validCats])));
+      // Keep every category the vision model returned, even if it doesn't exactly match
+      // CATEGORY_OPTIONS (e.g. "Tone & Empathy" vs "Empathy") -- silently dropping
+      // non-matching categories loses real QA feedback. Non-standard ones render as
+      // extra removable chips below (see the categories chip row).
+      // See docs/reviews/FUNCTIONS_INTELLIGENCE_REVIEW.md, Risk #5.
+      const extractedCats = Array.from(
+        new Set(result.categories.map((c) => c.trim()).filter(Boolean)),
+      );
+      setCategories((prev) => Array.from(new Set([...prev, ...extractedCats])));
       setPendingScreenshots([]);
     } catch (e) {
       setExtractError(e instanceof Error ? e.message : 'Could not read the screenshot(s).');
@@ -518,6 +525,25 @@ export default function QaReview() {
                 }}
               />
             ))}
+            {/* Custom/AI-extracted categories that don't match the standard list above --
+                shown instead of silently discarded, and removable via toggleCategory. */}
+            {categories
+              .filter((cat) => !CATEGORY_OPTIONS.includes(cat))
+              .map((cat) => (
+                <Chip
+                  key={cat}
+                  label={cat}
+                  size="small"
+                  onClick={() => toggleCategory(cat)}
+                  onDelete={() => toggleCategory(cat)}
+                  variant="outlined"
+                  sx={{
+                    fontWeight: 500,
+                    borderColor: 'primary.main',
+                    color: 'primary.main',
+                  }}
+                />
+              ))}
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button

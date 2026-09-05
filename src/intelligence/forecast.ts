@@ -7,6 +7,12 @@ export interface GradeForecast {
   trend: 'rising' | 'flat' | 'falling';
   daysRemaining: number;
   requiredDailyScore: number;
+  /** OLS regression slope (score change per day) over this week's logged entries. 0 if fewer than 2 data points. */
+  slope: number;
+  /** OLS regression intercept (score at day index 0 of the week). */
+  intercept: number;
+  /** ISO date (week-start key) the regression was computed against, so callers can map calendar dates to day-index. */
+  weekStart: string;
 }
 
 const TARGET_SCORE = TIER_POINTS.A_plus; // 4.0
@@ -54,6 +60,9 @@ export function calculateGradeForecast(
       trend: 'flat',
       daysRemaining,
       requiredDailyScore: TARGET_SCORE,
+      slope: 0,
+      intercept: 0,
+      weekStart,
     };
   }
 
@@ -111,5 +120,8 @@ export function calculateGradeForecast(
     trend,
     daysRemaining,
     requiredDailyScore,
+    slope,
+    intercept,
+    weekStart,
   };
 }

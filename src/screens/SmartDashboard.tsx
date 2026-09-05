@@ -377,10 +377,14 @@ export default function SmartDashboard({ onNavigate }: SmartDashboardProps) {
   const currentWeekStart = startOfWeekLocal(todayKey);
 
   // 1. Calculate current week & last week performance
-  const latestQa = useMemo(() => {
-    const sorted = Object.values(qaEntries).sort((a, b) => b.week_start.localeCompare(a.week_start));
-    return sorted[0]?.qa_percentage ?? null;
-  }, [qaEntries]);
+  // Each week's QA % must come from *that week's own* QA entry. Using the single
+  // most-recently-filed QA % for every week (the previous `latestQa` global lookup)
+  // silently rewrote historical grades whenever a new QA review was filed -- see
+  // docs/reviews/FUNCTIONS_INTELLIGENCE_REVIEW.md, Risk #3.
+  const qaForWeek = useCallback(
+    (weekStart: string): number | null => qaEntries[weekStart]?.qa_percentage ?? null,
+    [qaEntries],
+  );
 
   // Current week grade calculation
   const currentWeekGrade = useMemo(() => {
@@ -396,9 +400,9 @@ export default function SmartDashboard({ onNavigate }: SmartDashboardProps) {
       realEntries,
       weeklyEntries[currentWeekStart],
       targets,
-      latestQa,
+      qaForWeek(currentWeekStart),
     );
-  }, [entries, currentWeekStart, todayKey, weeklyEntries, targets, latestQa]);
+  }, [entries, currentWeekStart, todayKey, weeklyEntries, targets, qaForWeek]);
 
   // Previous week grade calculation for comparison
   const lastWeekStart = useMemo(() => addDays(currentWeekStart, -7), [currentWeekStart]);
@@ -414,9 +418,9 @@ export default function SmartDashboard({ onNavigate }: SmartDashboardProps) {
       realEntries,
       weeklyEntries[lastWeekStart],
       targets,
-      latestQa,
+      qaForWeek(lastWeekStart),
     );
-  }, [entries, lastWeekStart, weeklyEntries, targets, latestQa]);
+  }, [entries, lastWeekStart, weeklyEntries, targets, qaForWeek]);
 
   // Score comparison stats
   const scoreDiff = useMemo(() => {
@@ -483,28 +487,37 @@ export default function SmartDashboard({ onNavigate }: SmartDashboardProps) {
   const todayVolume = (todayEntry?.chats_handled ?? 0) + (todayEntry?.emails_handled ?? 0);
   const pendingTasks = tasks.filter((t) => t.status === 'pending').length;
 
-  // Week projection prediction
+  // Week projection prediction -- sourced from the real OLS forecast engine
+  // (src/intelligence/forecast.ts) instead of copying the current week's score under
+  // a "projection" label. See docs/reviews/FUNCTIONS_INTELLIGENCE_REVIEW.md, Risk #2.
   const weekProjection = useMemo(() => {
     // Days elapsed in current week
     const dateToday = dateFromKey(todayKey);
     const dateStart = dateFromKey(currentWeekStart);
     const dayIndex = Math.max(1, Math.min(7, Math.floor((dateToday.getTime() - dateStart.getTime()) / (1000 * 60 * 60 * 24)) + 1));
 
+    if (forecast) {
+      const projected = Math.min(5.0, Math.max(0.0, forecast.projectedScore));
+      return {
+        projectedScore: projected,
+        projectedGrade: scoreToGrade(projected),
+        dayIndex,
+      };
+    }
+
     if (currentWeekGrade.score === null) {
       return { projectedScore: 3.5, projectedGrade: 'A' as Tier, dayIndex };
     }
 
-    // Assume current daily rate continues for remaining days of week
-    const dailyAvg = currentWeekGrade.score;
-    const projected = Math.min(5.0, Math.max(0.0, dailyAvg));
-    const projectedGrade = scoreToGrade(projected);
-
+    // No forecast available yet (e.g. nothing logged this week) -- fall back to the
+    // current week's own score rather than inventing a number.
+    const projected = Math.min(5.0, Math.max(0.0, currentWeekGrade.score));
     return {
       projectedScore: projected,
-      projectedGrade,
+      projectedGrade: scoreToGrade(projected),
       dayIndex,
     };
-  }, [currentWeekGrade.score, todayKey, currentWeekStart]);
+  }, [forecast, currentWeekGrade.score, todayKey, currentWeekStart]);
 
   // 3. AI Focus of the Day Loading
   const refreshFocus = useCallback(() => {
@@ -608,7 +621,8 @@ export default function SmartDashboard({ onNavigate }: SmartDashboardProps) {
 
       let score: number | null = null;
       if (entry) {
-        score = computeWeightedGrade([entry], targets, latestQa).score;
+        // Use *this day's own week* QA %, not whatever week's QA was filed most recently.
+        score = computeWeightedGrade([entry], targets, qaForWeek(startOfWeekLocal(key))).score;
       }
 
       const monthDay = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -622,16 +636,23 @@ export default function SmartDashboard({ onNavigate }: SmartDashboardProps) {
       });
     }
 
-    // Projections for next 4 remaining days of the week
+    // Projections for next 4 remaining days of the week: extend the *real* OLS
+    // regression line the forecast engine already fit to this week's logged entries
+    // (src/intelligence/forecast.ts), instead of adding fabricated +/-variance noise.
+    // See docs/reviews/FUNCTIONS_INTELLIGENCE_REVIEW.md, Risk #5.
     const currentScoreAvg = currentWeekGrade.score ?? 3.8;
     for (let i = 1; i <= 4; i++) {
       const d = new Date(dateToday);
       d.setDate(d.getDate() + i);
       const monthDay = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-      // Slight natural variation for visualization realism
-      const variance = (i % 2 === 0 ? 0.05 : -0.03);
-      const projScore = Math.min(5.0, Math.max(0, currentScoreAvg + variance));
+      let projScore: number;
+      if (forecast) {
+        const dayIndex = Math.round((d.getTime() - dateFromKey(forecast.weekStart).getTime()) / (1000 * 60 * 60 * 24));
+        projScore = Math.min(5.0, Math.max(0, forecast.slope * dayIndex + forecast.intercept));
+      } else {
+        projScore = Math.min(5.0, Math.max(0, currentScoreAvg));
+      }
 
       list.push({
         dateLabel: monthDay,
@@ -648,7 +669,7 @@ export default function SmartDashboard({ onNavigate }: SmartDashboardProps) {
     }
 
     return list;
-  }, [entries, todayKey, targets, latestQa, currentWeekGrade.score]);
+  }, [entries, todayKey, targets, qaForWeek, currentWeekGrade.score, forecast]);
 
   // 6. Rule-based Proactive Insights
   const activeInsights = useMemo(() => {

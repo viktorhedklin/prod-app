@@ -22,3 +22,21 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local env files (Supabase URL/anon key are public by design, but keep them
+# out of git history as standard hygiene -- see docs/reviews/FUNCTIONS_INTELLIGENCE_REVIEW.md)
+.env
+.env.*
+!.env.example
+
+# Local QA/audit scratch artifacts (screenshots, one-off Playwright scripts) --
+# not app source, regenerated on demand, kept out of git to avoid binary bloat.
+qa/
+qa-review/
+
+# Nested git worktree used for gh-pages deploys -- has its own .git, must never
+# be added as a submodule/nested repo by accident.
+gh-deploy/
+
+# Conversation-scoped user uploads, not app source.
+incoming_files/

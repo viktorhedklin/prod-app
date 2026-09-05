@@ -315,19 +315,20 @@ export default function Today() {
     return `${fmt(s)} – ${fmt(e)}`;
   }, [weekStart]);
 
-  const latestQa = useMemo(() => {
-    const sorted = Object.values(qaEntries).sort((a, b) => b.week_start.localeCompare(a.week_start));
-    return sorted[0]?.qa_percentage ?? null;
-  }, [qaEntries]);
+  // Use *this specific week's own* QA entry, not whatever week's QA was filed most
+  // recently -- applying the globally-latest QA % to an arbitrary backfilled week
+  // silently corrupts that week's historical grade. See
+  // docs/reviews/FUNCTIONS_INTELLIGENCE_REVIEW.md, Risk #3.
+  const weekQa = useMemo(() => qaEntries[weekStart]?.qa_percentage ?? null, [qaEntries, weekStart]);
 
   const weeklyTier = useMemo(() => {
     if (!weekly) return null;
     const realInWeek = Object.entries(entries)
       .filter(([date]) => date >= weekStart && date <= addDays(weekStart, 6))
       .map(([, e]) => e);
-    const { grade } = computeWeeklyGrade(weekStart, realInWeek, weekly, targets, latestQa);
+    const { grade } = computeWeeklyGrade(weekStart, realInWeek, weekly, targets, weekQa);
     return grade;
-  }, [weekly, weekStart, targets, latestQa, entries]);
+  }, [weekly, weekStart, targets, weekQa, entries]);
 
   const handleStep = (key: keyof DailyEntry, delta: number, min?: number, max?: number) => {
     const current = entry[key] as number;
@@ -446,7 +447,7 @@ export default function Today() {
     notify('Weekly data deleted for this week', 'info');
   };
 
-  const aggregated = useMemo(() => aggregateEntries([entry], latestQa), [entry, latestQa]);
+  const aggregated = useMemo(() => aggregateEntries([entry], weekQa), [entry, weekQa]);
 
   const liveTiers = useMemo(() => {
     return targets.map((t) => {
@@ -460,7 +461,7 @@ export default function Today() {
     });
   }, [aggregated, targets]);
 
-  const { score, grade } = useMemo(() => computeWeightedGrade([entry], targets, latestQa), [entry, targets, latestQa]);
+  const { score, grade } = useMemo(() => computeWeightedGrade([entry], targets, weekQa), [entry, targets, weekQa]);
 
   const points = productivityPoints(entry);
 
